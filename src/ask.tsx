@@ -27,7 +27,8 @@ type Preferences = {
   defaultTownSlug?: string;
 };
 
-const DEFAULT_QUERY = "what's on today";
+const DEFAULT_QUERY = "";
+const FALLBACK_API_QUERY = "what's on today";
 const AUTO_TOWN_VALUE = "__auto__";
 const ZONE_VALUE_PREFIX = "zone:";
 
@@ -130,6 +131,10 @@ export default function Command(
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
   const debouncedSearchText = useDebouncedValue(searchText, 350);
+  const queryForApi = useMemo(() => {
+    const trimmed = debouncedSearchText.trim();
+    return trimmed || FALLBACK_API_QUERY;
+  }, [debouncedSearchText]);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,7 +243,7 @@ export default function Command(
 
       try {
         const result = await askTownspot({
-          query: debouncedSearchText,
+          query: queryForApi,
           townSlug: effectiveTownSlug,
           locale: preferences.locale,
           apiBaseUrl: preferences.apiBaseUrl,
@@ -265,7 +270,7 @@ export default function Command(
       cancelled = true;
     };
   }, [
-    debouncedSearchText,
+    queryForApi,
     preferences.apiBaseUrl,
     preferences.locale,
     effectiveTownSlug,
@@ -311,10 +316,10 @@ export default function Command(
     () =>
       buildGroundedSummary({
         townName: activeTownName,
-        query: debouncedSearchText,
+        query: queryForApi,
         events: filteredEvents,
       }),
-    [activeTownName, debouncedSearchText, filteredEvents],
+    [activeTownName, queryForApi, filteredEvents],
   );
   const sectionTimezone = response?.town?.timezone || "Europe/London";
   const daySections = useMemo(
@@ -363,23 +368,32 @@ export default function Command(
     >
       <List.Section title="Filters">
         <List.Item
-          title={`Category: ${selectedCategory}`}
-          subtitle="Press Enter to switch category"
+          title="Filter by Category"
+          subtitle={
+            selectedCategory === CATEGORY_ALL
+              ? "All categories. Press Enter to choose (Kids, Music, Free, ...)"
+              : `${selectedCategory}. Press Enter to change.`
+          }
           icon={Icon.Tag}
-          accessories={[{ text: `${filteredEvents.length} results` }]}
+          accessories={[
+            { text: selectedCategory },
+            { text: `${filteredEvents.length} results` },
+          ]}
           actions={
             <ActionPanel>
-              {categoryOptions.map((category) => (
+              <Action
+                title="Show All Categories"
+                onAction={() => setSelectedCategory(CATEGORY_ALL)}
+              />
+              {categoryOptions
+                .filter((category) => category !== CATEGORY_ALL)
+                .map((category) => (
                 <Action
                   key={category}
                   title={`Show ${category}`}
                   onAction={() => setSelectedCategory(category)}
                 />
               ))}
-              <Action
-                title="Clear Category Filter"
-                onAction={() => setSelectedCategory(CATEGORY_ALL)}
-              />
             </ActionPanel>
           }
         />
