@@ -5,6 +5,9 @@
   "version": "0.0.1",
   "private": true,
   "main": "dist/index.js",
+  "author": "mikegyi",
+  "license": "MIT",
+  "icon": "icon.png",
   "scripts": {
     "dev": "ray dev",
     "build": "ray build",
