@@ -30,14 +30,13 @@ export const buildGroundedSummary = (
 
   if (count === 0) {
     return {
-      title: `No verified events found in ${townName}`,
+      title: `No events found in ${townName}`,
       subtitle: `Try a broader search. Current window: ${timeframe}.`,
     };
   }
 
   return {
-    title: `${count} verified event${count === 1 ? "" : "s"} in ${townName}`,
+    title: `${count} event${count === 1 ? "" : "s"} in ${townName}`,
     subtitle: `Showing results for ${timeframe}. Use arrow keys to browse.`,
   };
 };
-

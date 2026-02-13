@@ -32,10 +32,13 @@ If you see `fetch failed`, check:
 ## Command
 
 - **Ask TownSpot** (`ask`)
-  - Type naturally in the search bar (`tonight`, `this weekend`, `kids and family`).
-  - Use up/down arrows to browse verified event results.
+  - Opens with today's listings by default.
+  - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
+  - Use up/down arrows to browse event results.
   - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
+  - Events are grouped by day sections (Today, Tomorrow, etc.) with time shown on the right.
+  - Press Enter to open a native Raycast event detail page. Website open is a separate action.
   - Town context resolution order:
     1. selected town from dropdown
     2. `Auto (Near Me)` via IP detection + `/api/places/match-zone`

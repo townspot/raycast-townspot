@@ -7,12 +7,14 @@ import {
   getPreferenceValues,
 } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
+import { formatEventTime, groupEventsByDay } from "./lib/event-listing";
 import { buildGroundedSummary } from "./lib/grounded-summary";
 import { resolveTownContext, TownContext } from "./lib/location-context";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
 import { RaycastResponse } from "./types";
+import { EventDetailView } from "./views/event-detail-view";
 
 type AskArguments = {
   query?: string;
@@ -25,7 +27,7 @@ type Preferences = {
   defaultTownSlug?: string;
 };
 
-const DEFAULT_QUERY = "what's on tonight";
+const DEFAULT_QUERY = "what's on today";
 const AUTO_TOWN_VALUE = "__auto__";
 const ZONE_VALUE_PREFIX = "zone:";
 
@@ -83,6 +85,12 @@ const parseZoneId = (value: string): number | null => {
   if (!Number.isFinite(id)) return null;
   return id;
 };
+
+const toCategoriesLabel = (tags: string[]): string =>
+  tags
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(", ");
 
 export default function Command(
   props: LaunchProps<{ arguments: AskArguments }>,
@@ -263,6 +271,11 @@ export default function Command(
       }),
     [activeTownName, debouncedSearchText, response],
   );
+  const sectionTimezone = response?.town?.timezone || "Europe/London";
+  const daySections = useMemo(
+    () => groupEventsByDay(response?.events || [], sectionTimezone),
+    [response, sectionTimezone],
+  );
 
   const sourceLabel =
     selectedTownValue === AUTO_TOWN_VALUE
@@ -303,42 +316,56 @@ export default function Command(
       }
       throttle
     >
-      <List.Section title="Verified Events">
-        {response?.events?.length ? (
-          response.events.map((event) => {
-            const normalizedEventUrl = normalizeEventUrl(event.url);
-            return (
-              <List.Item
-                key={event.id}
-                title={event.title}
-                subtitle={event.venueName || activeTownName}
-                icon={{ source: "icon.png" }}
-                accessories={[
-                  ...(event.startLabel ? [{ tag: event.startLabel }] : []),
-                  ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
-                ]}
-                actions={
-                  <ActionPanel>
-                    <Action.OpenInBrowser
-                      title="Open Event Page"
-                      url={normalizedEventUrl}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Event Link"
-                      content={normalizedEventUrl}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Event Name"
-                      content={event.title}
-                    />
-                  </ActionPanel>
-                }
-              />
-            );
-          })
-        ) : (
+      {daySections.length ? (
+        daySections.map((section) => (
+          <List.Section key={section.id} title={section.title}>
+            {section.events.map((event) => {
+              const normalizedEventUrl = normalizeEventUrl(event.url);
+              const timeLabel = formatEventTime(event.startTime, sectionTimezone);
+              const categoriesLabel = toCategoriesLabel(event.tags);
+              const subtitleBase = event.venueName || activeTownName;
+              const subtitle = categoriesLabel
+                ? `${subtitleBase} · ${categoriesLabel}`
+                : subtitleBase;
+
+              return (
+                <List.Item
+                  key={event.id}
+                  title={event.title}
+                  subtitle={subtitle}
+                  icon={{ source: "icon.png" }}
+                  accessories={timeLabel ? [{ text: timeLabel }] : []}
+                  actions={
+                    <ActionPanel>
+                      <Action.Push
+                        title="View Event Details"
+                        target={
+                          <EventDetailView
+                            event={event}
+                            timezone={sectionTimezone}
+                            url={normalizedEventUrl}
+                          />
+                        }
+                      />
+                      <Action.OpenInBrowser
+                        title="Open on Website"
+                        url={normalizedEventUrl}
+                      />
+                      <Action.CopyToClipboard
+                        title="Copy Event Link"
+                        content={normalizedEventUrl}
+                      />
+                    </ActionPanel>
+                  }
+                />
+              );
+            })}
+          </List.Section>
+        ))
+      ) : (
+        <List.Section title="Today">
           <List.Item
-            title="No verified events for this search"
+            title="No events for this search"
             subtitle="Try broadening your query or switch to a quick search preset."
             icon={Icon.Calendar}
             actions={
@@ -350,8 +377,8 @@ export default function Command(
               </ActionPanel>
             }
           />
-        )}
-      </List.Section>
+        </List.Section>
+      )}
 
       <List.Section title="Context">
         <List.Item
@@ -388,7 +415,7 @@ export default function Command(
           actions={
             <ActionPanel>
               <Action.CopyToClipboard
-                title="Copy Verified Summary"
+                title="Copy Summary"
                 content={`${summary.title}. ${summary.subtitle}`}
               />
             </ActionPanel>
