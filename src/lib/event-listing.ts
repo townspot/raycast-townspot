@@ -7,6 +7,7 @@ export type EventDaySection = {
 };
 
 export type TimeWindow =
+  | "now"
   | "all_upcoming"
   | "today"
   | "today_tomorrow"
@@ -15,6 +16,7 @@ export type TimeWindow =
   | "this_week";
 
 const DEFAULT_TIMEZONE = "Europe/London";
+const DEFAULT_EVENT_DURATION_MS = 2 * 60 * 60 * 1000;
 
 const formatDateKey = (value: Date, timezone: string): string =>
   new Intl.DateTimeFormat("en-CA", {
@@ -41,6 +43,19 @@ const keepUpcomingEvents = (events: RaycastEvent[]): RaycastEvent[] => {
     if (Number.isNaN(startMs)) return false;
     return startMs >= nowMs;
   });
+};
+
+const isEventLiveNow = (event: RaycastEvent, nowMs: number): boolean => {
+  const startMs = Date.parse(event.startTime || "");
+  if (Number.isNaN(startMs)) return false;
+
+  const parsedEndMs = Date.parse(event.endTime || "");
+  const endMs =
+    Number.isNaN(parsedEndMs) || parsedEndMs <= startMs
+      ? startMs + DEFAULT_EVENT_DURATION_MS
+      : parsedEndMs;
+
+  return nowMs >= startMs && nowMs < endMs;
 };
 
 const dateKeyForOffset = (base: Date, timezone: string, offsetDays: number): string => {
@@ -93,6 +108,10 @@ export const filterEventsByTimeWindow = (
   timeWindow: TimeWindow,
 ): RaycastEvent[] => {
   const now = new Date();
+  const nowMs = now.getTime();
+  if (timeWindow === "now") {
+    return events.filter((event) => isEventLiveNow(event, nowMs));
+  }
   if (timeWindow === "all_upcoming") {
     return keepUpcomingEvents(events);
   }
@@ -139,7 +158,7 @@ export const groupEventsByDay = (
   const tomorrowKey = formatDateKey(tomorrow, timezone);
 
   const grouped = new Map<string, EventDaySection>();
-  const sortedEvents = sortEvents(keepUpcomingEvents(events));
+  const sortedEvents = sortEvents(events);
 
   for (const event of sortedEvents) {
     const parsed = new Date(event.startTime || "");

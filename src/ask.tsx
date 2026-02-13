@@ -101,6 +101,7 @@ type TimeWindowOption = {
 };
 
 const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
+  { id: "now", title: "Now", queryHint: "what's on now" },
   { id: "all_upcoming", title: "All Upcoming", queryHint: "what's on this week" },
   { id: "today", title: "Today", queryHint: "what's on today" },
   {

@@ -36,7 +36,7 @@ If you see `fetch failed`, check:
   - Opens with upcoming listings and defaults to `Today + Tomorrow`.
   - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
   - Use up/down arrows to browse event results.
-  - Use the top `When` filter row to jump between All Upcoming, Today, Today + Tomorrow, Next 3/7 Days, and This Week.
+  - Use the top `When` filter row to jump between Now, All Upcoming, Today, Today + Tomorrow, Next 3/7 Days, and This Week.
   - Use the top `Category` filter row to quickly toggle categories (including kids/family).
   - Set or change your Home Zone from the dropdown selector (visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
