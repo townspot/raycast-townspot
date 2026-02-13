@@ -86,21 +86,19 @@ const DEFAULT_TIME_WINDOW: TimeWindow = "today_tomorrow";
 type TimeWindowOption = {
   id: TimeWindow;
   title: string;
-  queryHint: string;
 };
 
 const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
-  { id: "now", title: "Now", queryHint: "what's on now" },
-  { id: "all_upcoming", title: "All Upcoming", queryHint: "what's on this week" },
-  { id: "today", title: "Today", queryHint: "what's on today" },
+  { id: "now", title: "Now" },
+  { id: "all_upcoming", title: "All Upcoming" },
+  { id: "today", title: "Today" },
   {
     id: "today_tomorrow",
     title: "Today + Tomorrow",
-    queryHint: "what's on today and tomorrow",
   },
-  { id: "next_3_days", title: "Next 3 Days", queryHint: "what's on over the next 3 days" },
-  { id: "next_7_days", title: "Next 7 Days", queryHint: "what's on over the next 7 days" },
-  { id: "this_week", title: "This Week", queryHint: "what's on this week" },
+  { id: "next_3_days", title: "Next 3 Days" },
+  { id: "next_7_days", title: "Next 7 Days" },
+  { id: "this_week", title: "This Week" },
 ];
 
 const normalizeCategory = (value: string): string =>
