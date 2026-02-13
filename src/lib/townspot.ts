@@ -30,40 +30,59 @@ const sanitizeApiBaseUrl = (apiBaseUrl: string): string => {
   return value;
 };
 
+const buildLocalEndpointCandidates = (baseUrl: string): string[] => {
+  const normalized = baseUrl.replace(/\/$/, "");
+  const endpoint = `${normalized}/raycast/query`;
+  return [...new Set([endpoint, endpoint.replace("localhost", "127.0.0.1")])];
+};
+
+const buildFailureMessage = (endpoint: string, details: string): string =>
+  `Could not reach TownSpot at ${endpoint}. Verify the server is running and reachable. ` +
+  `Try ${endpoint.replace("localhost", "127.0.0.1")} for 127.0.0.1 fallback. (${details})`;
+
 export const askTownspot = async (payload: AskPayload): Promise<RaycastResponse> => {
   const query = sanitizeQuery(payload.query);
   const townSlug = sanitizeTown(payload.townSlug);
   const locale = sanitizeLocale(payload.locale);
   const apiBaseUrl = sanitizeApiBaseUrl(payload.apiBaseUrl);
-  const endpoint = `${apiBaseUrl.replace(/\/$/, "")}/raycast/query`;
+  const candidateEndpoints = buildLocalEndpointCandidates(apiBaseUrl);
 
-  let response: Response;
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        query,
-        townSlug,
-        locale,
-        limit: payload.limit || 8,
-        conversation: payload.conversation || [],
-      }),
-    });
-  } catch (error) {
-    const details = error instanceof Error ? error.message : "unknown network error";
-    throw new Error(
-      `Could not reach TownSpot at ${endpoint}. Ensure the server is running and reachable. ` +
-        `Use http://localhost:3000/api for local dev. (${details})`,
-    );
+  let response: Response | undefined;
+  let lastError: Error | undefined;
+
+  for (const endpoint of candidateEndpoints) {
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          townSlug,
+          locale,
+          limit: payload.limit || 8,
+          conversation: payload.conversation || [],
+        }),
+      });
+      break;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("unknown network error");
+      response = undefined;
+    }
   }
+
+  if (!response) {
+    const details = lastError?.message || "unknown network error";
+    throw new Error(buildFailureMessage(candidateEndpoints[0], details));
+  }
+
+  const checkedEndpoint = response.url || candidateEndpoints[0];
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`TownSpot query failed (${response.status}): ${details || response.statusText}`);
+    throw new Error(`TownSpot query failed (${response.status}) at ${checkedEndpoint}: ${details || response.statusText}`);
   }
 
   const body = (await response.json()) as RaycastResponse;
