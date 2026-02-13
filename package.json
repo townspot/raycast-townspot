@@ -1,0 +1,67 @@
+{
+  "name": "raycast-townspot",
+  "title": "TownSpot",
+  "description": "Raycast command to ask TownSpot what's on.",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "raycast dev",
+    "build": "raycast build",
+    "lint": "raycast lint"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.89.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "commands": [
+    {
+      "name": "ask",
+      "title": "Ask TownSpot",
+      "description": "Ask what's on in your Town with conversational search.",
+      "mode": "view",
+      "path": "ask",
+      "keywords": ["events", "townspot", "weekend", "music"],
+      "arguments": [
+        {
+          "name": "query",
+          "type": "text",
+          "required": false,
+          "default": "What's on in kentish-town tonight?",
+          "placeholder": "What are people doing tonight?"
+        },
+        {
+          "name": "townSlug",
+          "type": "text",
+          "required": false,
+          "default": "kentish-town",
+          "placeholder": "kentish-town"
+        }
+      ],
+      "preferences": [
+        {
+          "name": "apiBaseUrl",
+          "title": "TownSpot API Base URL",
+          "description": "Base URL for the TownSpot API",
+          "type": "textfield",
+          "required": true,
+          "default": "https://townspot.co/api"
+        },
+        {
+          "name": "locale",
+          "title": "Locale",
+          "description": "API locale (en-GB, es-ES, ca-ES)",
+          "type": "textfield",
+          "required": true,
+          "default": "en-GB"
+        }
+      ]
+    }
+  ]
+}
