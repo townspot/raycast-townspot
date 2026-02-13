@@ -129,12 +129,6 @@ const EventMetadata = ({
       <Detail.Metadata.Label title="Town" text={details?.zoneName || "Unknown"} />
       <Detail.Metadata.Separator />
       <Detail.Metadata.Link title="TownSpot Link" target={url} text="Open listing" />
-      {details?.sourceUrl ? (
-        <>
-          <Detail.Metadata.Separator />
-          <Detail.Metadata.Link title="Source Link" target={details.sourceUrl} text="Open source" />
-        </>
-      ) : null}
     </Detail.Metadata>
   );
 };
