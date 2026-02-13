@@ -6,9 +6,9 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "dev": "raycast dev",
-    "build": "raycast build",
-    "lint": "raycast lint"
+    "dev": "ray dev",
+    "build": "ray build",
+    "lint": "ray lint"
   },
   "dependencies": {
     "@raycast/api": "^1.89.2"

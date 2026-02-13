@@ -16,6 +16,8 @@ npm install
 npm run dev
 ```
 
+If your Raycast CLI binary is not on PATH, `npm run dev` uses the local `ray` CLI bundled in the extension dependency.
+
 ## Command
 
 - **Ask TownSpot** (`ask`)
