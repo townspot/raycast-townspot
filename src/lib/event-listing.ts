@@ -26,6 +26,15 @@ const sortEvents = (events: RaycastEvent[]): RaycastEvent[] =>
     return aTime - bTime;
   });
 
+const keepUpcomingEvents = (events: RaycastEvent[]): RaycastEvent[] => {
+  const nowMs = Date.now();
+  return events.filter((event) => {
+    const startMs = Date.parse(event.startTime || "");
+    if (Number.isNaN(startMs)) return false;
+    return startMs >= nowMs;
+  });
+};
+
 const dayLabel = (date: Date, timezone: string): string =>
   new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone || DEFAULT_TIMEZONE,
@@ -56,7 +65,7 @@ export const groupEventsByDay = (
   const tomorrowKey = formatDateKey(tomorrow, timezone);
 
   const grouped = new Map<string, EventDaySection>();
-  const sortedEvents = sortEvents(events);
+  const sortedEvents = sortEvents(keepUpcomingEvents(events));
 
   for (const event of sortedEvents) {
     const parsed = new Date(event.startTime || "");
@@ -82,4 +91,3 @@ export const groupEventsByDay = (
 
   return Array.from(grouped.values());
 };
-
