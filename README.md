@@ -32,20 +32,18 @@ If you see `fetch failed`, check:
 ## Command
 
 - **Ask TownSpot** (`ask`)
+  - First use requires setting a `Home Zone` before event results load.
   - Opens with upcoming listings and defaults to `Today + Tomorrow`.
   - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
   - Use up/down arrows to browse event results.
   - Use the top `When` filter row to jump between All Upcoming, Today, Today + Tomorrow, Next 3/7 Days, and This Week.
   - Use the top `Category` filter row to quickly toggle categories (including kids/family).
-  - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
+  - Set or change your Home Zone from the dropdown selector (visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
   - Events are grouped by day sections (Today, Tomorrow, etc.) with time shown on the right.
   - Press Enter to open a native Raycast event detail page with full event metadata (description, venue/address, categories, pricing).
   - Event detail includes map actions (Apple Maps / Google Maps) when event coordinates are available.
-  - Town context resolution order:
-    1. selected town from dropdown
-    2. `Auto (Near Me)` via IP detection + `/api/places/match-zone`
-    3. fallback: `kentish-town`
+  - Home Zone is saved locally after selection and reused on next launch.
 
 ## Endpoint Contract
 

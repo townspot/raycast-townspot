@@ -4,6 +4,7 @@ import {
   Icon,
   LaunchProps,
   List,
+  LocalStorage,
   getPreferenceValues,
 } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
@@ -14,7 +15,6 @@ import {
   TimeWindow,
 } from "./lib/event-listing";
 import { buildGroundedSummary } from "./lib/grounded-summary";
-import { resolveTownContext, TownContext } from "./lib/location-context";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
@@ -29,24 +29,17 @@ type AskArguments = {
 type Preferences = {
   apiBaseUrl: string;
   locale: string;
-  defaultTownSlug?: string;
 };
 
 const DEFAULT_QUERY = "";
 const FALLBACK_API_QUERY = "what's on this week";
-const AUTO_TOWN_VALUE = "__auto__";
+const HOME_ZONE_STORAGE_KEY = "townspot-home-zone-id";
+const NO_ZONE_VALUE = "__unset__";
 const ZONE_VALUE_PREFIX = "zone:";
 
 const sanitizeQuery = (value: string | undefined): string => {
   const trimmed = String(value || "").trim();
   return trimmed ? trimmed : DEFAULT_QUERY;
-};
-
-const formatSourceLabel = (source: TownContext["source"]): string => {
-  if (source === "detected") return "auto-detected from your location";
-  if (source === "argument") return "from command argument";
-  if (source === "preference") return "from command preference";
-  return "fallback town";
 };
 
 const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
@@ -142,28 +135,53 @@ export default function Command(
   const preferences = getPreferenceValues<Preferences>();
   const initialTownSlug = sanitizeTownSlug(props.arguments.townSlug || "");
   const initialQuery = sanitizeQuery(props.arguments.query);
-  const initialSelectedTown =
-    initialTownSlug ||
-    sanitizeTownSlug(preferences.defaultTownSlug || "") ||
-    AUTO_TOWN_VALUE;
 
-  const [townContext, setTownContext] = useState<TownContext | null>(null);
   const [zones, setZones] = useState<ActiveZoneOption[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [zonesError, setZonesError] = useState("");
-  const [selectedTownValue, setSelectedTownValue] = useState(initialSelectedTown);
+  const [homeZoneLoading, setHomeZoneLoading] = useState(true);
+  const [homeZoneId, setHomeZoneId] = useState<number | null>(null);
+  const [selectedTownValue, setSelectedTownValue] = useState(NO_ZONE_VALUE);
   const [searchText, setSearchText] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
-  const [resolvingTown, setResolvingTown] = useState(true);
   const [response, setResponse] = useState<RaycastResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<TimeWindow>(DEFAULT_TIME_WINDOW);
+
   const debouncedSearchText = useDebouncedValue(searchText, 350);
   const queryForApi = useMemo(() => {
     const trimmed = debouncedSearchText.trim();
     return trimmed || FALLBACK_API_QUERY;
   }, [debouncedSearchText]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHomeZone = async () => {
+      setHomeZoneLoading(true);
+      try {
+        const stored = await LocalStorage.getItem<string>(HOME_ZONE_STORAGE_KEY);
+        if (cancelled) return;
+        const parsed = Number(stored || "");
+        if (Number.isFinite(parsed)) {
+          setHomeZoneId(parsed);
+        } else {
+          setHomeZoneId(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setHomeZoneLoading(false);
+        }
+      }
+    };
+
+    void loadHomeZone();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,71 +216,57 @@ export default function Command(
   }, [preferences.apiBaseUrl, preferences.locale]);
 
   useEffect(() => {
-    if (selectedTownValue === AUTO_TOWN_VALUE) return;
-    if (!zones.length) return;
-    const selectedZoneId = parseZoneId(selectedTownValue);
-    const isValid = selectedZoneId !== null
-      ? zones.some((zone) => zone.id === selectedZoneId)
-      : zones.some((zone) => zone.slug === selectedTownValue);
-    if (isValid) return;
-    setSelectedTownValue(AUTO_TOWN_VALUE);
-  }, [selectedTownValue, zones]);
+    if (homeZoneLoading || zonesLoading) return;
 
-  useEffect(() => {
-    if (selectedTownValue !== AUTO_TOWN_VALUE) {
-      setTownContext(null);
-      setResolvingTown(false);
+    const selectedZoneId = parseZoneId(selectedTownValue);
+    if (selectedZoneId !== null) {
+      const exists = zones.some((zone) => zone.id === selectedZoneId);
+      if (!exists) {
+        setSelectedTownValue(NO_ZONE_VALUE);
+      }
       return;
     }
 
-    let cancelled = false;
+    if (initialTownSlug) {
+      const argumentZone = zones.find((zone) => zone.slug === initialTownSlug);
+      if (argumentZone) {
+        setSelectedTownValue(toZoneValue(argumentZone.id));
+        setHomeZoneId(argumentZone.id);
+        void LocalStorage.setItem(HOME_ZONE_STORAGE_KEY, String(argumentZone.id));
+        return;
+      }
+    }
 
-    const resolveTown = async () => {
-      setResolvingTown(true);
-      const resolved = await resolveTownContext({
-        argumentTownSlug: "",
-        defaultTownSlug: "",
-        apiBaseUrl: preferences.apiBaseUrl,
-      });
-
-      if (cancelled) return;
-      setTownContext(resolved);
-      setResolvingTown(false);
-    };
-
-    void resolveTown();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [preferences.apiBaseUrl, selectedTownValue]);
+    if (homeZoneId !== null) {
+      const storedHomeZone = zones.find((zone) => zone.id === homeZoneId);
+      if (storedHomeZone) {
+        setSelectedTownValue(toZoneValue(storedHomeZone.id));
+        return;
+      }
+      setHomeZoneId(null);
+      void LocalStorage.removeItem(HOME_ZONE_STORAGE_KEY);
+    }
+  }, [homeZoneLoading, zonesLoading, zones, selectedTownValue, initialTownSlug, homeZoneId]);
 
   const selectedZone = useMemo(
     () => {
       const selectedZoneId = parseZoneId(selectedTownValue);
-      if (selectedZoneId !== null) {
-        return zones.find((zone) => zone.id === selectedZoneId);
-      }
-      if (selectedTownValue === AUTO_TOWN_VALUE) return undefined;
-      return zones.find((zone) => zone.slug === selectedTownValue);
+      if (selectedZoneId === null) return undefined;
+      return zones.find((zone) => zone.id === selectedZoneId);
     },
     [selectedTownValue, zones],
   );
 
-  useEffect(() => {
-    if (selectedTownValue === AUTO_TOWN_VALUE) return;
-    if (selectedTownValue.startsWith(ZONE_VALUE_PREFIX)) return;
-    if (!selectedZone) return;
-    setSelectedTownValue(toZoneValue(selectedZone.id));
-  }, [selectedTownValue, selectedZone]);
-
-  const effectiveTownSlug =
-    selectedTownValue === AUTO_TOWN_VALUE
-      ? townContext?.slug || ""
-      : selectedZone?.slug || sanitizeTownSlug(selectedTownValue);
+  const needsHomeZone = !selectedZone;
+  const effectiveTownSlug = selectedZone?.slug || "";
 
   useEffect(() => {
-    if (!effectiveTownSlug) return;
+    if (!effectiveTownSlug) {
+      setResponse(null);
+      setErrorMessage("");
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     const runQuery = async () => {
@@ -306,13 +310,11 @@ export default function Command(
     effectiveTownSlug,
   ]);
 
-  const activeTownName =
-    selectedTownValue === AUTO_TOWN_VALUE
-      ? response?.town?.name || townContext?.name || "Town"
-      : selectedZone?.name || "Town";
+  const activeTownName = selectedZone?.name || "Home Zone";
   const activeTownSlug = effectiveTownSlug || "";
   const activeTimezone =
     response?.town?.slug === activeTownSlug ? response?.town?.timezone || "" : "";
+
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
     for (const event of response?.events || []) {
@@ -331,6 +333,7 @@ export default function Command(
     }
     return [CATEGORY_ALL, ...sorted];
   }, [response]);
+
   const categoryFilteredEvents = useMemo(
     () =>
       (response?.events || []).filter((event) =>
@@ -338,10 +341,12 @@ export default function Command(
       ),
     [response, selectedCategory],
   );
+
   useEffect(() => {
     if (categoryOptions.includes(selectedCategory)) return;
     setSelectedCategory(CATEGORY_ALL);
   }, [categoryOptions, selectedCategory]);
+
   const sectionTimezone = response?.town?.timezone || "Europe/London";
   const timeWindowEvents = useMemo(
     () =>
@@ -352,6 +357,7 @@ export default function Command(
       ),
     [categoryFilteredEvents, sectionTimezone, selectedTimeWindow],
   );
+
   const summary = useMemo(
     () =>
       buildGroundedSummary({
@@ -361,38 +367,55 @@ export default function Command(
       }),
     [activeTownName, queryForApi, timeWindowEvents],
   );
+
   const daySections = useMemo(
     () => groupEventsByDay(timeWindowEvents, sectionTimezone),
     [timeWindowEvents, sectionTimezone],
   );
 
-  const sourceLabel =
-    selectedTownValue === AUTO_TOWN_VALUE
-      ? townContext
-        ? formatSourceLabel(townContext.source)
-        : "resolving nearby town"
-      : "selected from active towns";
-  const contextSubtitle =
-    selectedTownValue === AUTO_TOWN_VALUE && townContext?.source === "fallback"
-      ? "Auto Near Me is unavailable right now. Choose your Town from the dropdown above."
-      : `Currently using ${activeTownName} (${sourceLabel}).`;
+  const setHomeZone = async (zone: ActiveZoneOption): Promise<void> => {
+    setSelectedTownValue(toZoneValue(zone.id));
+    setHomeZoneId(zone.id);
+    await LocalStorage.setItem(HOME_ZONE_STORAGE_KEY, String(zone.id));
+  };
+
+  const onHomeZoneChange = async (value: string): Promise<void> => {
+    if (value === NO_ZONE_VALUE) return;
+    const zoneId = parseZoneId(value);
+    if (zoneId === null) return;
+    const zone = zones.find((item) => item.id === zoneId);
+    if (!zone) return;
+    await setHomeZone(zone);
+  };
+
+  const resetHomeZone = async (): Promise<void> => {
+    setSelectedTownValue(NO_ZONE_VALUE);
+    setHomeZoneId(null);
+    setResponse(null);
+    await LocalStorage.removeItem(HOME_ZONE_STORAGE_KEY);
+  };
 
   return (
     <List
-      isLoading={loading || resolvingTown || zonesLoading}
-      searchBarPlaceholder="Ask naturally: tonight, weekend, kids events, free events..."
+      isLoading={loading || zonesLoading || homeZoneLoading}
+      searchBarPlaceholder={
+        needsHomeZone
+          ? "Set your Home Zone from the dropdown to start"
+          : "Ask naturally: tonight, weekend, kids events, free events..."
+      }
       searchText={searchText}
       onSearchTextChange={setSearchText}
       searchBarAccessory={
         <List.Dropdown
-          tooltip="Town (Set Your Zone)"
-          storeValue
+          tooltip="Home Zone"
           value={selectedTownValue}
-          onChange={setSelectedTownValue}
+          onChange={(value) => {
+            void onHomeZoneChange(value);
+          }}
         >
           <List.Dropdown.Item
-            value={AUTO_TOWN_VALUE}
-            title="Auto (Near Me)"
+            value={NO_ZONE_VALUE}
+            title={needsHomeZone ? "Set Home Zone..." : "Change Home Zone..."}
             icon={Icon.Pin}
           />
           <List.Dropdown.Section title="Active Towns">
@@ -408,213 +431,248 @@ export default function Command(
       }
       throttle
     >
-      <List.Section title="Filters">
-        <List.Item
-          title="When"
-          subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch quickly.`}
-          icon={Icon.Clock}
-          accessories={[{ text: `${timeWindowEvents.length} events` }]}
-          actions={
-            <ActionPanel>
-              {TIME_WINDOW_OPTIONS.map((option) => (
-                <Action
-                  key={option.id}
-                  title={`Show ${option.title}`}
-                  onAction={() => {
-                    setSelectedTimeWindow(option.id);
-                    setSearchText(option.queryHint);
-                  }}
-                />
-              ))}
-            </ActionPanel>
-          }
-        />
-        <List.Item
-          title="Filter by Category"
-          subtitle={
-            selectedCategory === CATEGORY_ALL
-              ? "All categories. Press Enter to choose (Kids, Music, Free, ...)"
-              : `${selectedCategory}. Press Enter to change.`
-          }
-          icon={Icon.Tag}
-          accessories={[
-            { text: selectedCategory },
-            { text: `${timeWindowEvents.length} results` },
-          ]}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Show All Categories"
-                onAction={() => setSelectedCategory(CATEGORY_ALL)}
-              />
-              {categoryOptions
-                .filter((category) => category !== CATEGORY_ALL)
-                .map((category) => (
-                <Action
-                  key={category}
-                  title={`Show ${category}`}
-                  onAction={() => setSelectedCategory(category)}
-                />
-              ))}
-            </ActionPanel>
-          }
-        />
-      </List.Section>
-
-      {daySections.length ? (
-        daySections.map((section) => (
-          <List.Section key={section.id} title={section.title}>
-            {section.events.map((event) => {
-              const normalizedEventUrl = normalizeEventUrl(event.url);
-              const timeLabel = formatEventTime(event.startTime, sectionTimezone);
-              const categoriesLabel = toCategoriesLabel(event.tags);
-              const subtitleBase = event.venueName || activeTownName;
-              const subtitle = categoriesLabel
-                ? `${subtitleBase} · ${categoriesLabel}`
-                : subtitleBase;
-
-              return (
-                <List.Item
-                  key={event.id}
-                  title={event.title}
-                  subtitle={subtitle}
-                  icon={{ source: "icon.png" }}
-                  accessories={timeLabel ? [{ text: timeLabel }] : []}
-                  actions={
-                    <ActionPanel>
-                      <Action.Push
-                        title="View Event Details"
-                        target={
-                          <EventDetailView
-                            event={event}
-                            timezone={sectionTimezone}
-                            url={normalizedEventUrl}
-                            apiBaseUrl={preferences.apiBaseUrl}
-                          />
-                        }
-                      />
-                      <Action.OpenInBrowser
-                        title="Open on Website"
-                        url={normalizedEventUrl}
-                      />
-                      <Action.CopyToClipboard
-                        title="Copy Event Link"
-                        content={normalizedEventUrl}
-                      />
-                    </ActionPanel>
-                  }
-                />
-              );
-            })}
-          </List.Section>
-        ))
-      ) : (
-        <List.Section title="Today">
+      {needsHomeZone ? (
+        <List.Section title="Setup">
           <List.Item
-            title="No events for this search"
-            subtitle="Try broadening your query or switch to a quick search preset."
-            icon={Icon.Calendar}
+            title="Set your Home Zone to continue"
+            subtitle={
+              zonesLoading
+                ? "Loading active towns..."
+                : "Open the Home Zone dropdown above and choose your Town."
+            }
+            icon={Icon.Pin}
             actions={
               <ActionPanel>
-                <Action
-                  title="Search This Weekend"
-                  onAction={() => setSearchText("what's on this weekend")}
-                />
+                {zones.map((zone) => (
+                  <Action
+                    key={zone.id}
+                    title={`Set Home Zone: ${zone.name}`}
+                    onAction={() => {
+                      void setHomeZone(zone);
+                    }}
+                  />
+                ))}
               </ActionPanel>
             }
           />
         </List.Section>
-      )}
-
-      <List.Section title="Context">
-        <List.Item
-          title={`Town: ${activeTownName}`}
-          subtitle={contextSubtitle}
-          icon={{ source: "icon.png" }}
-          accessories={[
-            { text: `${zones.length} active` },
-            ...(activeTimezone ? [{ text: activeTimezone }] : []),
-          ]}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Use Auto (Near Me)"
-                onAction={() => setSelectedTownValue(AUTO_TOWN_VALUE)}
-                icon={Icon.Pin}
-              />
-              <Action
-                title="Use Kids and Family Query"
-                onAction={() => setSearchText("kids and family events this weekend")}
-                icon={Icon.Person}
-              />
-              <Action.CopyToClipboard
-                title="Copy Town Slug"
-                content={activeTownSlug}
-              />
-            </ActionPanel>
-          }
-        />
-        <List.Item
-          title={summary.title}
-          subtitle={summary.subtitle}
-          icon={Icon.Stars}
-          actions={
-            <ActionPanel>
-              <Action.CopyToClipboard
-                title="Copy Summary"
-                content={`${summary.title}. ${summary.subtitle}`}
-              />
-            </ActionPanel>
-          }
-        />
-      </List.Section>
-
-      <List.Section title="Quick Searches">
-        {QUICK_QUERY_PRESETS.map((preset) => (
-          <List.Item
-            key={preset.id}
-            title={preset.title}
-            subtitle={preset.subtitle}
-            icon={Icon.MagnifyingGlass}
-            actions={
-              <ActionPanel>
-                <Action
-                  title="Run Search"
-                  onAction={() => setSearchText(preset.query)}
-                />
-                <Action.CopyToClipboard
-                  title="Copy Query"
-                  content={preset.query}
-                />
-              </ActionPanel>
-            }
-          />
-        ))}
-      </List.Section>
-
-      {response?.suggestions?.length ? (
-        <List.Section title="Follow-up Prompts">
-          {response.suggestions.map((suggestion, index) => (
+      ) : (
+        <>
+          <List.Section title="Filters">
             <List.Item
-              key={`${index}-${suggestion}`}
-              title={suggestion}
-              icon={Icon.Repeat}
+              title="When"
+              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch quickly.`}
+              icon={Icon.Clock}
+              accessories={[{ text: `${timeWindowEvents.length} events` }]}
+              actions={
+                <ActionPanel>
+                  {TIME_WINDOW_OPTIONS.map((option) => (
+                    <Action
+                      key={option.id}
+                      title={`Show ${option.title}`}
+                      onAction={() => {
+                        setSelectedTimeWindow(option.id);
+                        setSearchText(option.queryHint);
+                      }}
+                    />
+                  ))}
+                </ActionPanel>
+              }
+            />
+            <List.Item
+              title="Filter by Category"
+              subtitle={
+                selectedCategory === CATEGORY_ALL
+                  ? "All categories. Press Enter to choose (Kids, Music, Free, ...)"
+                  : `${selectedCategory}. Press Enter to change.`
+              }
+              icon={Icon.Tag}
+              accessories={[
+                { text: selectedCategory },
+                { text: `${timeWindowEvents.length} results` },
+              ]}
               actions={
                 <ActionPanel>
                   <Action
-                    title="Run Follow-up Search"
-                    onAction={() => setSearchText(suggestion)}
+                    title="Show All Categories"
+                    onAction={() => setSelectedCategory(CATEGORY_ALL)}
+                  />
+                  {categoryOptions
+                    .filter((category) => category !== CATEGORY_ALL)
+                    .map((category) => (
+                    <Action
+                      key={category}
+                      title={`Show ${category}`}
+                      onAction={() => setSelectedCategory(category)}
+                    />
+                  ))}
+                </ActionPanel>
+              }
+            />
+          </List.Section>
+
+          {daySections.length ? (
+            daySections.map((section) => (
+              <List.Section key={section.id} title={section.title}>
+                {section.events.map((event) => {
+                  const normalizedEventUrl = normalizeEventUrl(event.url);
+                  const timeLabel = formatEventTime(event.startTime, sectionTimezone);
+                  const categoriesLabel = toCategoriesLabel(event.tags);
+                  const subtitleBase = event.venueName || activeTownName;
+                  const subtitle = categoriesLabel
+                    ? `${subtitleBase} · ${categoriesLabel}`
+                    : subtitleBase;
+
+                  return (
+                    <List.Item
+                      key={event.id}
+                      title={event.title}
+                      subtitle={subtitle}
+                      icon={{ source: "icon.png" }}
+                      accessories={timeLabel ? [{ text: timeLabel }] : []}
+                      actions={
+                        <ActionPanel>
+                          <Action.Push
+                            title="View Event Details"
+                            target={
+                              <EventDetailView
+                                event={event}
+                                timezone={sectionTimezone}
+                                url={normalizedEventUrl}
+                                apiBaseUrl={preferences.apiBaseUrl}
+                              />
+                            }
+                          />
+                          <Action.OpenInBrowser
+                            title="Open on Website"
+                            url={normalizedEventUrl}
+                          />
+                          <Action.CopyToClipboard
+                            title="Copy Event Link"
+                            content={normalizedEventUrl}
+                          />
+                        </ActionPanel>
+                      }
+                    />
+                  );
+                })}
+              </List.Section>
+            ))
+          ) : (
+            <List.Section title="Today">
+              <List.Item
+                title="No events for this search"
+                subtitle="Try broadening your query or switch to another time window."
+                icon={Icon.Calendar}
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Show All Upcoming"
+                      onAction={() => setSelectedTimeWindow("all_upcoming")}
+                    />
+                    <Action
+                      title="Search This Weekend"
+                      onAction={() => setSearchText("what's on this weekend")}
+                    />
+                  </ActionPanel>
+                }
+              />
+            </List.Section>
+          )}
+
+          <List.Section title="Home Zone">
+            <List.Item
+              title={`Home Zone: ${activeTownName}`}
+              subtitle={activeTownSlug || "not set"}
+              icon={{ source: "icon.png" }}
+              accessories={[
+                { text: `${zones.length} active` },
+                ...(activeTimezone ? [{ text: activeTimezone }] : []),
+              ]}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Reset Home Zone"
+                    onAction={() => {
+                      void resetHomeZone();
+                    }}
+                    icon={Icon.XMarkCircle}
+                  />
+                  <Action
+                    title="Use Kids and Family Query"
+                    onAction={() => setSearchText("kids and family events this weekend")}
+                    icon={Icon.Person}
                   />
                   <Action.CopyToClipboard
-                    title="Copy Follow-up"
-                    content={suggestion}
+                    title="Copy Town Slug"
+                    content={activeTownSlug}
                   />
                 </ActionPanel>
               }
             />
-          ))}
-        </List.Section>
-      ) : null}
+            <List.Item
+              title={summary.title}
+              subtitle={summary.subtitle}
+              icon={Icon.Stars}
+              actions={
+                <ActionPanel>
+                  <Action.CopyToClipboard
+                    title="Copy Summary"
+                    content={`${summary.title}. ${summary.subtitle}`}
+                  />
+                </ActionPanel>
+              }
+            />
+          </List.Section>
+
+          <List.Section title="Quick Searches">
+            {QUICK_QUERY_PRESETS.map((preset) => (
+              <List.Item
+                key={preset.id}
+                title={preset.title}
+                subtitle={preset.subtitle}
+                icon={Icon.MagnifyingGlass}
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Run Search"
+                      onAction={() => setSearchText(preset.query)}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Query"
+                      content={preset.query}
+                    />
+                  </ActionPanel>
+                }
+              />
+            ))}
+          </List.Section>
+
+          {response?.suggestions?.length ? (
+            <List.Section title="Follow-up Prompts">
+              {response.suggestions.map((suggestion, index) => (
+                <List.Item
+                  key={`${index}-${suggestion}`}
+                  title={suggestion}
+                  icon={Icon.Repeat}
+                  actions={
+                    <ActionPanel>
+                      <Action
+                        title="Run Follow-up Search"
+                        onAction={() => setSearchText(suggestion)}
+                      />
+                      <Action.CopyToClipboard
+                        title="Copy Follow-up"
+                        content={suggestion}
+                      />
+                    </ActionPanel>
+                  }
+                />
+              ))}
+            </List.Section>
+          ) : null}
+        </>
+      )}
 
       {errorMessage ? (
         <List.Section title="Connection">
@@ -627,21 +685,11 @@ export default function Command(
       ) : null}
 
       {zonesError ? (
-        <List.Section title="Town Selector">
+        <List.Section title="Home Zone">
           <List.Item
             title="Active towns unavailable"
             subtitle={zonesError}
             icon={Icon.ExclamationMark}
-          />
-        </List.Section>
-      ) : null}
-
-      {selectedTownValue === AUTO_TOWN_VALUE && townContext?.source === "fallback" ? (
-        <List.Section title="Town Selector">
-          <List.Item
-            title="Auto Near Me unavailable"
-            subtitle="Use the Town dropdown above to set your zone manually."
-            icon={Icon.PinDisabled}
           />
         </List.Section>
       ) : null}
