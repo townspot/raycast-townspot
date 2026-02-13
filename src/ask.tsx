@@ -182,6 +182,7 @@ export default function Command(
     const runQuery = async () => {
       setLoading(true);
       setErrorMessage("");
+      setResponse(null);
 
       try {
         const result = await askTownspot({
@@ -219,12 +220,12 @@ export default function Command(
   ]);
 
   const activeTownName =
-    response?.town?.name ||
-    selectedZone?.name ||
-    townContext?.name ||
-    "Town";
-  const activeTownSlug = response?.town?.slug || effectiveTownSlug || "";
-  const activeTimezone = response?.town?.timezone || "";
+    selectedTownValue === AUTO_TOWN_VALUE
+      ? response?.town?.name || townContext?.name || "Town"
+      : selectedZone?.name || "Town";
+  const activeTownSlug = effectiveTownSlug || "";
+  const activeTimezone =
+    response?.town?.slug === activeTownSlug ? response?.town?.timezone || "" : "";
   const summary = useMemo(
     () =>
       buildGroundedSummary({
