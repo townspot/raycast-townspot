@@ -274,6 +274,56 @@ export default function Command(
       }
       throttle
     >
+      <List.Section title="Verified Events">
+        {response?.events?.length ? (
+          response.events.map((event) => {
+            const normalizedEventUrl = normalizeEventUrl(event.url);
+            return (
+              <List.Item
+                key={event.id}
+                title={event.title}
+                subtitle={event.venueName || activeTownName}
+                icon={{ source: "icon.png" }}
+                accessories={[
+                  ...(event.startLabel ? [{ tag: event.startLabel }] : []),
+                  ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
+                ]}
+                actions={
+                  <ActionPanel>
+                    <Action.OpenInBrowser
+                      title="Open Event Page"
+                      url={normalizedEventUrl}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Event Link"
+                      content={normalizedEventUrl}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Event Name"
+                      content={event.title}
+                    />
+                  </ActionPanel>
+                }
+              />
+            );
+          })
+        ) : (
+          <List.Item
+            title="No verified events for this search"
+            subtitle="Try broadening your query or switch to a quick search preset."
+            icon={Icon.Calendar}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Search This Weekend"
+                  onAction={() => setSearchText("what's on this weekend")}
+                />
+              </ActionPanel>
+            }
+          />
+        )}
+      </List.Section>
+
       <List.Section title="Context">
         <List.Item
           title={`Town: ${activeTownName}`}
@@ -338,56 +388,6 @@ export default function Command(
             }
           />
         ))}
-      </List.Section>
-
-      <List.Section title="Verified Events">
-        {response?.events?.length ? (
-          response.events.map((event) => {
-            const normalizedEventUrl = normalizeEventUrl(event.url);
-            return (
-              <List.Item
-                key={event.id}
-                title={event.title}
-                subtitle={event.venueName || activeTownName}
-                icon={{ source: "icon.png" }}
-                accessories={[
-                  ...(event.startLabel ? [{ tag: event.startLabel }] : []),
-                  ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
-                ]}
-                actions={
-                  <ActionPanel>
-                    <Action.OpenInBrowser
-                      title="Open Event Page"
-                      url={normalizedEventUrl}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Event Link"
-                      content={normalizedEventUrl}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Event Name"
-                      content={event.title}
-                    />
-                  </ActionPanel>
-                }
-              />
-            );
-          })
-        ) : (
-          <List.Item
-            title="No verified events for this search"
-            subtitle="Try broadening your query or switch to a quick search preset."
-            icon={Icon.Calendar}
-            actions={
-              <ActionPanel>
-                <Action
-                  title="Search This Weekend"
-                  onAction={() => setSearchText("what's on this weekend")}
-                />
-              </ActionPanel>
-            }
-          />
-        )}
       </List.Section>
 
       {response?.suggestions?.length ? (
