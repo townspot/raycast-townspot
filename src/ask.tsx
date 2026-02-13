@@ -51,6 +51,29 @@ const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   return debounced;
 };
 
+const hasUuid = (value: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+
+const normalizeEventUrl = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl);
+    const match = parsed.pathname.match(/^\/event\/([^/]+)$/i);
+    if (!match) return rawUrl;
+
+    const slugOrUuid = match[1];
+    if (hasUuid(slugOrUuid)) return rawUrl;
+    if (/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slugOrUuid)) {
+      return rawUrl;
+    }
+
+    return `${parsed.origin}/${slugOrUuid}`;
+  } catch {
+    return rawUrl;
+  }
+};
+
 export default function Command(
   props: LaunchProps<{ arguments: AskArguments }>,
 ): JSX.Element {
@@ -319,34 +342,37 @@ export default function Command(
 
       <List.Section title="Verified Events">
         {response?.events?.length ? (
-          response.events.map((event) => (
-            <List.Item
-              key={event.id}
-              title={event.title}
-              subtitle={event.venueName || activeTownName}
-              icon={{ source: "icon.png" }}
-              accessories={[
-                ...(event.startLabel ? [{ tag: event.startLabel }] : []),
-                ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
-              ]}
-              actions={
-                <ActionPanel>
-                  <Action.OpenInBrowser
-                    title="Open Event Page"
-                    url={event.url}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Event Link"
-                    content={event.url}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Event Name"
-                    content={event.title}
-                  />
-                </ActionPanel>
-              }
-            />
-          ))
+          response.events.map((event) => {
+            const normalizedEventUrl = normalizeEventUrl(event.url);
+            return (
+              <List.Item
+                key={event.id}
+                title={event.title}
+                subtitle={event.venueName || activeTownName}
+                icon={{ source: "icon.png" }}
+                accessories={[
+                  ...(event.startLabel ? [{ tag: event.startLabel }] : []),
+                  ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
+                ]}
+                actions={
+                  <ActionPanel>
+                    <Action.OpenInBrowser
+                      title="Open Event Page"
+                      url={normalizedEventUrl}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Event Link"
+                      content={normalizedEventUrl}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Event Name"
+                      content={event.title}
+                    />
+                  </ActionPanel>
+                }
+              />
+            );
+          })
         ) : (
           <List.Item
             title="No verified events for this search"
