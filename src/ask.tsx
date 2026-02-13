@@ -27,6 +27,7 @@ type Preferences = {
 
 const DEFAULT_QUERY = "what's on tonight";
 const AUTO_TOWN_VALUE = "__auto__";
+const ZONE_VALUE_PREFIX = "zone:";
 
 const sanitizeQuery = (value: string | undefined): string => {
   const trimmed = String(value || "").trim();
@@ -72,6 +73,15 @@ const normalizeEventUrl = (rawUrl: string): string => {
   } catch {
     return rawUrl;
   }
+};
+
+const toZoneValue = (id: number): string => `${ZONE_VALUE_PREFIX}${id}`;
+
+const parseZoneId = (value: string): number | null => {
+  if (!value.startsWith(ZONE_VALUE_PREFIX)) return null;
+  const id = Number(value.slice(ZONE_VALUE_PREFIX.length));
+  if (!Number.isFinite(id)) return null;
+  return id;
 };
 
 export default function Command(
@@ -132,7 +142,11 @@ export default function Command(
   useEffect(() => {
     if (selectedTownValue === AUTO_TOWN_VALUE) return;
     if (!zones.length) return;
-    if (zones.some((zone) => zone.slug === selectedTownValue)) return;
+    const selectedZoneId = parseZoneId(selectedTownValue);
+    const isValid = selectedZoneId !== null
+      ? zones.some((zone) => zone.id === selectedZoneId)
+      : zones.some((zone) => zone.slug === selectedTownValue);
+    if (isValid) return;
     setSelectedTownValue(AUTO_TOWN_VALUE);
   }, [selectedTownValue, zones]);
 
@@ -166,14 +180,28 @@ export default function Command(
   }, [preferences.apiBaseUrl, selectedTownValue]);
 
   const selectedZone = useMemo(
-    () => zones.find((zone) => zone.slug === selectedTownValue),
+    () => {
+      const selectedZoneId = parseZoneId(selectedTownValue);
+      if (selectedZoneId !== null) {
+        return zones.find((zone) => zone.id === selectedZoneId);
+      }
+      if (selectedTownValue === AUTO_TOWN_VALUE) return undefined;
+      return zones.find((zone) => zone.slug === selectedTownValue);
+    },
     [selectedTownValue, zones],
   );
+
+  useEffect(() => {
+    if (selectedTownValue === AUTO_TOWN_VALUE) return;
+    if (selectedTownValue.startsWith(ZONE_VALUE_PREFIX)) return;
+    if (!selectedZone) return;
+    setSelectedTownValue(toZoneValue(selectedZone.id));
+  }, [selectedTownValue, selectedZone]);
 
   const effectiveTownSlug =
     selectedTownValue === AUTO_TOWN_VALUE
       ? townContext?.slug || ""
-      : selectedTownValue;
+      : selectedZone?.slug || sanitizeTownSlug(selectedTownValue);
 
   useEffect(() => {
     if (!effectiveTownSlug) return;
@@ -265,8 +293,8 @@ export default function Command(
           <List.Dropdown.Section title="Active Towns">
             {zones.map((zone) => (
               <List.Dropdown.Item
-                key={zone.slug}
-                value={zone.slug}
+                key={zone.id}
+                value={toZoneValue(zone.id)}
                 title={zone.name}
               />
             ))}
