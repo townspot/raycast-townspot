@@ -20,7 +20,7 @@ declare namespace Preferences {
   /** Locale - API locale (en-GB, es-ES, ca-ES) */
   "locale": string,
   /** Default Town Slug - Optional fallback town when auto-detection is unavailable */
-  "defaultTownSlug": string
+  "defaultTownSlug"?: string
 }
 }
 
