@@ -1,126 +1,298 @@
 import {
   Action,
   ActionPanel,
-  Detail,
-  Form,
+  Icon,
+  LaunchProps,
+  List,
   getPreferenceValues,
-  showToast,
-  Toast,
 } from "@raycast/api";
-import { useState } from "react";
-import { askTownspot } from "./lib/townspot";
+import { useEffect, useMemo, useState } from "react";
+import { buildGroundedSummary } from "./lib/grounded-summary";
+import { resolveTownContext, TownContext } from "./lib/location-context";
+import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
+import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
 import { RaycastResponse } from "./types";
 
-type AskFormValues = {
-  query: string;
-  townSlug: string;
+type AskArguments = {
+  query?: string;
+  townSlug?: string;
 };
 
 type Preferences = {
   apiBaseUrl: string;
   locale: string;
+  defaultTownSlug?: string;
 };
 
-const buildMarkdown = (response: RaycastResponse): string => {
-  const eventsSection = response.events
-    .map((event) => {
-      const when = event.startLabel || event.startTime;
-      const timeLabel = when ? ` (${when})` : "";
-      const location = event.venueName ? ` @ ${event.venueName}` : "";
-      const tags = event.tags.length ? `\nTags: ${event.tags.join(", ")}` : "";
-      return `- **${event.title}**${location}${timeLabel}\n  ${tags}\n  [Open event](${event.url})`;
-    })
-    .join("\n\n");
+const DEFAULT_QUERY = "what's on tonight";
 
-  const suggestions = response.suggestions
-    .map((suggestion) => `- ${suggestion}`)
-    .join("\n");
-
-  return [
-    `## ${response.answer}`,
-    "",
-    "### Town",
-    `${response.town.name} (${response.town.slug}) • ${response.town.timezone}`,
-    response.events.length ? "\n### Upcoming events" : "\n### Upcoming events",
-    eventsSection || "No matches right now.",
-    "",
-    "### Suggestions",
-    suggestions || "- Ask a follow-up in a new query.",
-  ].join("\n");
+const sanitizeQuery = (value: string | undefined): string => {
+  const trimmed = String(value || "").trim();
+  return trimmed ? trimmed : DEFAULT_QUERY;
 };
 
-export default function Command(): JSX.Element {
-  const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<RaycastResponse | null>(null);
+const formatSourceLabel = (source: TownContext["source"]): string => {
+  if (source === "detected") return "auto-detected from your location";
+  if (source === "argument") return "from command argument";
+  if (source === "preference") return "from command preference";
+  return "fallback town";
+};
+
+const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebounced(value), waitMs);
+    return () => clearTimeout(timeout);
+  }, [value, waitMs]);
+
+  return debounced;
+};
+
+export default function Command(
+  props: LaunchProps<{ arguments: AskArguments }>,
+): JSX.Element {
   const preferences = getPreferenceValues<Preferences>();
+  const initialTownSlug = sanitizeTownSlug(props.arguments.townSlug || "");
+  const initialQuery = sanitizeQuery(props.arguments.query);
 
-  const handleSubmit = async (values: AskFormValues) => {
-    setLoading(true);
-    try {
-      const result = await askTownspot({
-        query: values.query,
-        townSlug: values.townSlug,
-        locale: preferences.locale,
+  const [townContext, setTownContext] = useState<TownContext | null>(null);
+  const [searchText, setSearchText] = useState(initialQuery);
+  const [loading, setLoading] = useState(false);
+  const [resolvingTown, setResolvingTown] = useState(true);
+  const [response, setResponse] = useState<RaycastResponse | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const debouncedSearchText = useDebouncedValue(searchText, 350);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveTown = async () => {
+      setResolvingTown(true);
+      const resolved = await resolveTownContext({
+        argumentTownSlug: initialTownSlug,
+        defaultTownSlug: preferences.defaultTownSlug,
         apiBaseUrl: preferences.apiBaseUrl,
-        conversation: [],
       });
 
-      setResponse(result);
-    } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "TownSpot query failed",
-        message: error instanceof Error ? error.message : "Unable to reach TownSpot",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (cancelled) return;
+      setTownContext(resolved);
+      setResolvingTown(false);
+    };
 
-  if (!response) {
-    return (
-      <Form
-        isLoading={loading}
-        actions={
-          <ActionPanel>
-            <Action.SubmitForm title="Ask TownSpot" onSubmit={handleSubmit} />
-          </ActionPanel>
+    void resolveTown();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialTownSlug, preferences.apiBaseUrl, preferences.defaultTownSlug]);
+
+  useEffect(() => {
+    if (!townContext?.slug) return;
+
+    let cancelled = false;
+    const runQuery = async () => {
+      setLoading(true);
+      setErrorMessage("");
+
+      try {
+        const result = await askTownspot({
+          query: debouncedSearchText,
+          townSlug: townContext.slug,
+          locale: preferences.locale,
+          apiBaseUrl: preferences.apiBaseUrl,
+          conversation: [],
+        });
+        if (cancelled) return;
+        setResponse(result);
+      } catch (error) {
+        if (cancelled) return;
+        setResponse(null);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to reach TownSpot",
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
-      >
-        <Form.TextField
-          id="query"
-          title="Ask"
-          placeholder="What\'s on in kentish-town tonight?"
-          defaultValue="what's on in kentish-town tonight"
-        />
-        <Form.TextField
-          id="townSlug"
-          title="Town Slug"
-          placeholder="kentish-town"
-          defaultValue="kentish-town"
-        />
-      </Form>
-    );
-  }
+      }
+    };
+
+    void runQuery();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    debouncedSearchText,
+    preferences.apiBaseUrl,
+    preferences.locale,
+    townContext?.slug,
+  ]);
+
+  const activeTownName = response?.town?.name || townContext?.name || "Town";
+  const activeTownSlug = response?.town?.slug || townContext?.slug || "";
+  const activeTimezone = response?.town?.timezone || "";
+  const summary = useMemo(
+    () =>
+      buildGroundedSummary({
+        townName: activeTownName,
+        query: debouncedSearchText,
+        events: response?.events || [],
+      }),
+    [activeTownName, debouncedSearchText, response],
+  );
+
+  const contextSubtitle = townContext
+    ? `${activeTownSlug} · ${formatSourceLabel(townContext.source)}`
+    : "Resolving your location context";
 
   return (
-    <Detail
-      isLoading={loading}
-      markdown={buildMarkdown(response)}
-      actions={
-        <ActionPanel>
-          <Action
-            title="Ask another question"
-            onAction={() => {
-              setResponse(null);
-            }}
+    <List
+      isLoading={loading || resolvingTown}
+      searchBarPlaceholder="Ask naturally: tonight, weekend, kids events, free events..."
+      searchText={searchText}
+      onSearchTextChange={setSearchText}
+      throttle
+    >
+      <List.Section title="Context">
+        <List.Item
+          title={`Town: ${activeTownName}`}
+          subtitle={contextSubtitle}
+          icon={{ source: "icon.png" }}
+          accessories={activeTimezone ? [{ text: activeTimezone }] : []}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Use Kids and Family Query"
+                onAction={() => setSearchText("kids and family events this weekend")}
+                icon={Icon.Person}
+              />
+              <Action.CopyToClipboard
+                title="Copy Town Slug"
+                content={activeTownSlug}
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title={summary.title}
+          subtitle={summary.subtitle}
+          icon={Icon.Stars}
+          actions={
+            <ActionPanel>
+              <Action.CopyToClipboard
+                title="Copy Verified Summary"
+                content={`${summary.title}. ${summary.subtitle}`}
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+
+      <List.Section title="Quick Searches">
+        {QUICK_QUERY_PRESETS.map((preset) => (
+          <List.Item
+            key={preset.id}
+            title={preset.title}
+            subtitle={preset.subtitle}
+            icon={Icon.MagnifyingGlass}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Run Search"
+                  onAction={() => setSearchText(preset.query)}
+                />
+                <Action.CopyToClipboard
+                  title="Copy Query"
+                  content={preset.query}
+                />
+              </ActionPanel>
+            }
           />
-          <Action.CopyToClipboard
-            title="Copy Answer"
-            content={response.answer}
+        ))}
+      </List.Section>
+
+      <List.Section title="Verified Events">
+        {response?.events?.length ? (
+          response.events.map((event) => (
+            <List.Item
+              key={event.id}
+              title={event.title}
+              subtitle={event.venueName || activeTownName}
+              icon={{ source: "icon.png" }}
+              accessories={[
+                ...(event.startLabel ? [{ tag: event.startLabel }] : []),
+                ...(event.tags[0] ? [{ text: event.tags[0] }] : []),
+              ]}
+              actions={
+                <ActionPanel>
+                  <Action.OpenInBrowser
+                    title="Open Event Page"
+                    url={event.url}
+                  />
+                  <Action.CopyToClipboard
+                    title="Copy Event Link"
+                    content={event.url}
+                  />
+                  <Action.CopyToClipboard
+                    title="Copy Event Name"
+                    content={event.title}
+                  />
+                </ActionPanel>
+              }
+            />
+          ))
+        ) : (
+          <List.Item
+            title="No verified events for this search"
+            subtitle="Try broadening your query or switch to a quick search preset."
+            icon={Icon.Calendar}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Search This Weekend"
+                  onAction={() => setSearchText("what's on this weekend")}
+                />
+              </ActionPanel>
+            }
           />
-        </ActionPanel>
-      }
-    />
+        )}
+      </List.Section>
+
+      {response?.suggestions?.length ? (
+        <List.Section title="Follow-up Prompts">
+          {response.suggestions.map((suggestion, index) => (
+            <List.Item
+              key={`${index}-${suggestion}`}
+              title={suggestion}
+              icon={Icon.Repeat}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Run Follow-up Search"
+                    onAction={() => setSearchText(suggestion)}
+                  />
+                  <Action.CopyToClipboard
+                    title="Copy Follow-up"
+                    content={suggestion}
+                  />
+                </ActionPanel>
+              }
+            />
+          ))}
+        </List.Section>
+      ) : null}
+
+      {errorMessage ? (
+        <List.Section title="Connection">
+          <List.Item
+            title="Unable to load TownSpot events"
+            subtitle={errorMessage}
+            icon={Icon.ExclamationMark}
+          />
+        </List.Section>
+      ) : null}
+    </List>
   );
 }

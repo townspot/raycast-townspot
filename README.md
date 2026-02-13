@@ -1,6 +1,6 @@
 # TownSpot Raycast Extension
 
-A Raycast command for natural-language event discovery in your Town.
+Arrow-key-first event discovery in Raycast with grounded results from TownSpot.
 
 ## Setup
 
@@ -32,9 +32,14 @@ If you see `fetch failed`, check:
 ## Command
 
 - **Ask TownSpot** (`ask`)
-  - Ask a free-text question.
-  - Set your town slug (for example `kentish-town`).
-  - Configure the backend URL and locale in command preferences.
+  - Type naturally in the search bar (`tonight`, `this weekend`, `kids and family`).
+  - Use up/down arrows to browse verified event results.
+  - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
+  - Town context resolution order:
+    1. command argument `townSlug`
+    2. `Default Town Slug` preference
+    3. IP-based location detection via `ipapi.co` + `/api/places/match-zone`
+    4. fallback: `kentish-town`
 
 ## Endpoint Contract
 
@@ -71,3 +76,9 @@ Response:
   "suggestions": ["..."]
 }
 ```
+
+## UX Behavior
+
+- Results list is verified-events-first.
+- Summary shown in the command is generated from returned events, not free-form AI text.
+- Follow-up prompts can be selected with arrow keys and Enter to re-run quickly.

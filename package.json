@@ -64,6 +64,14 @@
           "type": "textfield",
           "required": true,
           "default": "en-GB"
+        },
+        {
+          "name": "defaultTownSlug",
+          "title": "Default Town Slug",
+          "description": "Optional fallback town when auto-detection is unavailable",
+          "type": "textfield",
+          "required": false,
+          "default": "kentish-town"
         }
       ]
     }

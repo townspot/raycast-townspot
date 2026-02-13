@@ -5,7 +5,7 @@ const sanitizeQuery = (query: string): string => {
   return trimmed.length ? trimmed : "what's on";
 };
 
-const sanitizeTown = (townSlug: string): string =>
+export const sanitizeTownSlug = (townSlug: string): string =>
   String(townSlug || "")
     .toLowerCase()
     .trim()
@@ -19,7 +19,7 @@ const sanitizeLocale = (locale: string): string => {
   return value;
 };
 
-const sanitizeApiBaseUrl = (apiBaseUrl: string): string => {
+export const normalizeApiBaseUrl = (apiBaseUrl: string): string => {
   const value = String(apiBaseUrl || "").trim();
   if (!value) {
     throw new Error("TownSpot API Base URL is required.");
@@ -42,9 +42,9 @@ const buildFailureMessage = (endpoint: string, details: string): string =>
 
 export const askTownspot = async (payload: AskPayload): Promise<RaycastResponse> => {
   const query = sanitizeQuery(payload.query);
-  const townSlug = sanitizeTown(payload.townSlug);
+  const townSlug = sanitizeTownSlug(payload.townSlug);
   const locale = sanitizeLocale(payload.locale);
-  const apiBaseUrl = sanitizeApiBaseUrl(payload.apiBaseUrl);
+  const apiBaseUrl = normalizeApiBaseUrl(payload.apiBaseUrl);
   const candidateEndpoints = buildLocalEndpointCandidates(apiBaseUrl);
 
   let response: Response | undefined;
