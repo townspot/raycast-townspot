@@ -27,6 +27,7 @@
     {
       "name": "ask",
       "title": "Ask TownSpot",
+      "icon": "icon.png",
       "description": "Ask what's on in your Town with conversational search.",
       "mode": "view",
       "path": "ask",
