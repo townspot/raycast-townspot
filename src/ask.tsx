@@ -83,7 +83,6 @@ export default function Command(
       try {
         const activeZones = await fetchActiveZones(
           preferences.apiBaseUrl,
-          preferences.locale,
         );
         if (cancelled) return;
         setZones(activeZones);

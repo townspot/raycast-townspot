@@ -16,14 +16,6 @@ type RawZone = {
   hidden?: boolean;
 };
 
-const localeToCountry = (locale: string): string | undefined => {
-  const normalized = String(locale || "").toLowerCase();
-  if (!normalized) return undefined;
-  if (normalized.startsWith("en")) return "uk";
-  if (normalized.startsWith("es") || normalized.startsWith("ca")) return "es";
-  return undefined;
-};
-
 const toActiveZoneOption = (zone: RawZone): ActiveZoneOption | null => {
   const id = Number(zone.id);
   const slug = sanitizeTownSlug(zone.slug || "");
@@ -56,13 +48,9 @@ const uniqueBySlug = (zones: ActiveZoneOption[]): ActiveZoneOption[] => {
 
 export const fetchActiveZones = async (
   apiBaseUrl: string,
-  locale: string,
 ): Promise<ActiveZoneOption[]> => {
   const normalizedBaseUrl = normalizeApiBaseUrl(apiBaseUrl).replace(/\/$/, "");
-  const country = localeToCountry(locale);
-  const endpoint = country
-    ? `${normalizedBaseUrl}/list?country=${encodeURIComponent(country)}`
-    : `${normalizedBaseUrl}/list`;
+  const endpoint = `${normalizedBaseUrl}/list`;
 
   const response = await fetch(endpoint, {
     headers: {
@@ -84,4 +72,3 @@ export const fetchActiveZones = async (
 
   return uniqueBySlug(options);
 };
-
