@@ -40,7 +40,8 @@ If you see `fetch failed`, check:
   - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
   - Events are grouped by day sections (Today, Tomorrow, etc.) with time shown on the right.
-  - Press Enter to open a native Raycast event detail page. Website open is a separate action.
+  - Press Enter to open a native Raycast event detail page with full event metadata (description, venue/address, categories, pricing).
+  - Event detail includes map actions (Apple Maps / Google Maps) when event coordinates are available.
   - Town context resolution order:
     1. selected town from dropdown
     2. `Auto (Near Me)` via IP detection + `/api/places/match-zone`

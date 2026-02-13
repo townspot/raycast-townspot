@@ -7,6 +7,7 @@ export type EventDaySection = {
 };
 
 export type TimeWindow =
+  | "all_upcoming"
   | "today"
   | "today_tomorrow"
   | "next_3_days"
@@ -92,6 +93,9 @@ export const filterEventsByTimeWindow = (
   timeWindow: TimeWindow,
 ): RaycastEvent[] => {
   const now = new Date();
+  if (timeWindow === "all_upcoming") {
+    return keepUpcomingEvents(events);
+  }
   const todayKey = formatDateKey(now, timezone);
   const allowedDateKeys = new Set<string>();
 

@@ -108,6 +108,7 @@ type TimeWindowOption = {
 };
 
 const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
+  { id: "all_upcoming", title: "All Upcoming", queryHint: "what's on this week" },
   { id: "today", title: "Today", queryHint: "what's on today" },
   {
     id: "today_tomorrow",
@@ -488,6 +489,7 @@ export default function Command(
                             event={event}
                             timezone={sectionTimezone}
                             url={normalizedEventUrl}
+                            apiBaseUrl={preferences.apiBaseUrl}
                           />
                         }
                       />
