@@ -34,12 +34,12 @@ If you see `fetch failed`, check:
 - **Ask TownSpot** (`ask`)
   - Type naturally in the search bar (`tonight`, `this weekend`, `kids and family`).
   - Use up/down arrows to browse verified event results.
+  - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
   - Town context resolution order:
-    1. command argument `townSlug`
-    2. `Default Town Slug` preference
-    3. IP-based location detection via `ipapi.co` + `/api/places/match-zone`
-    4. fallback: `kentish-town`
+    1. selected town from dropdown
+    2. `Auto (Near Me)` via IP detection + `/api/places/match-zone`
+    3. fallback: `kentish-town`
 
 ## Endpoint Contract
 

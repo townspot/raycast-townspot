@@ -11,6 +11,7 @@ import { buildGroundedSummary } from "./lib/grounded-summary";
 import { resolveTownContext, TownContext } from "./lib/location-context";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
+import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
 import { RaycastResponse } from "./types";
 
 type AskArguments = {
@@ -25,6 +26,7 @@ type Preferences = {
 };
 
 const DEFAULT_QUERY = "what's on tonight";
+const AUTO_TOWN_VALUE = "__auto__";
 
 const sanitizeQuery = (value: string | undefined): string => {
   const trimmed = String(value || "").trim();
@@ -55,8 +57,16 @@ export default function Command(
   const preferences = getPreferenceValues<Preferences>();
   const initialTownSlug = sanitizeTownSlug(props.arguments.townSlug || "");
   const initialQuery = sanitizeQuery(props.arguments.query);
+  const initialSelectedTown =
+    initialTownSlug ||
+    sanitizeTownSlug(preferences.defaultTownSlug || "") ||
+    AUTO_TOWN_VALUE;
 
   const [townContext, setTownContext] = useState<TownContext | null>(null);
+  const [zones, setZones] = useState<ActiveZoneOption[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(true);
+  const [zonesError, setZonesError] = useState("");
+  const [selectedTownValue, setSelectedTownValue] = useState(initialSelectedTown);
   const [searchText, setSearchText] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [resolvingTown, setResolvingTown] = useState(true);
@@ -67,11 +77,57 @@ export default function Command(
   useEffect(() => {
     let cancelled = false;
 
+    const loadZones = async () => {
+      setZonesLoading(true);
+      setZonesError("");
+      try {
+        const activeZones = await fetchActiveZones(
+          preferences.apiBaseUrl,
+          preferences.locale,
+        );
+        if (cancelled) return;
+        setZones(activeZones);
+      } catch (error) {
+        if (cancelled) return;
+        setZones([]);
+        setZonesError(
+          error instanceof Error ? error.message : "Unable to load active towns",
+        );
+      } finally {
+        if (!cancelled) {
+          setZonesLoading(false);
+        }
+      }
+    };
+
+    void loadZones();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preferences.apiBaseUrl, preferences.locale]);
+
+  useEffect(() => {
+    if (selectedTownValue === AUTO_TOWN_VALUE) return;
+    if (!zones.length) return;
+    if (zones.some((zone) => zone.slug === selectedTownValue)) return;
+    setSelectedTownValue(AUTO_TOWN_VALUE);
+  }, [selectedTownValue, zones]);
+
+  useEffect(() => {
+    if (selectedTownValue !== AUTO_TOWN_VALUE) {
+      setTownContext(null);
+      setResolvingTown(false);
+      return;
+    }
+
+    let cancelled = false;
+
     const resolveTown = async () => {
       setResolvingTown(true);
       const resolved = await resolveTownContext({
-        argumentTownSlug: initialTownSlug,
-        defaultTownSlug: preferences.defaultTownSlug,
+        argumentTownSlug: "",
+        defaultTownSlug: "",
         apiBaseUrl: preferences.apiBaseUrl,
       });
 
@@ -85,10 +141,20 @@ export default function Command(
     return () => {
       cancelled = true;
     };
-  }, [initialTownSlug, preferences.apiBaseUrl, preferences.defaultTownSlug]);
+  }, [preferences.apiBaseUrl, selectedTownValue]);
+
+  const selectedZone = useMemo(
+    () => zones.find((zone) => zone.slug === selectedTownValue),
+    [selectedTownValue, zones],
+  );
+
+  const effectiveTownSlug =
+    selectedTownValue === AUTO_TOWN_VALUE
+      ? townContext?.slug || ""
+      : selectedTownValue;
 
   useEffect(() => {
-    if (!townContext?.slug) return;
+    if (!effectiveTownSlug) return;
 
     let cancelled = false;
     const runQuery = async () => {
@@ -98,7 +164,7 @@ export default function Command(
       try {
         const result = await askTownspot({
           query: debouncedSearchText,
-          townSlug: townContext.slug,
+          townSlug: effectiveTownSlug,
           locale: preferences.locale,
           apiBaseUrl: preferences.apiBaseUrl,
           conversation: [],
@@ -127,11 +193,15 @@ export default function Command(
     debouncedSearchText,
     preferences.apiBaseUrl,
     preferences.locale,
-    townContext?.slug,
+    effectiveTownSlug,
   ]);
 
-  const activeTownName = response?.town?.name || townContext?.name || "Town";
-  const activeTownSlug = response?.town?.slug || townContext?.slug || "";
+  const activeTownName =
+    response?.town?.name ||
+    selectedZone?.name ||
+    townContext?.name ||
+    "Town";
+  const activeTownSlug = response?.town?.slug || effectiveTownSlug || "";
   const activeTimezone = response?.town?.timezone || "";
   const summary = useMemo(
     () =>
@@ -143,16 +213,43 @@ export default function Command(
     [activeTownName, debouncedSearchText, response],
   );
 
-  const contextSubtitle = townContext
-    ? `${activeTownSlug} · ${formatSourceLabel(townContext.source)}`
-    : "Resolving your location context";
+  const sourceLabel =
+    selectedTownValue === AUTO_TOWN_VALUE
+      ? townContext
+        ? formatSourceLabel(townContext.source)
+        : "resolving nearby town"
+      : "selected from active towns";
+  const contextSubtitle = `${activeTownSlug || "unknown"} · ${sourceLabel}`;
 
   return (
     <List
-      isLoading={loading || resolvingTown}
+      isLoading={loading || resolvingTown || zonesLoading}
       searchBarPlaceholder="Ask naturally: tonight, weekend, kids events, free events..."
       searchText={searchText}
       onSearchTextChange={setSearchText}
+      searchBarAccessory={
+        <List.Dropdown
+          tooltip="Town"
+          storeValue
+          value={selectedTownValue}
+          onChange={setSelectedTownValue}
+        >
+          <List.Dropdown.Item
+            value={AUTO_TOWN_VALUE}
+            title="Auto (Near Me)"
+            icon={Icon.Pin}
+          />
+          <List.Dropdown.Section title="Active Towns">
+            {zones.map((zone) => (
+              <List.Dropdown.Item
+                key={zone.slug}
+                value={zone.slug}
+                title={zone.name}
+              />
+            ))}
+          </List.Dropdown.Section>
+        </List.Dropdown>
+      }
       throttle
     >
       <List.Section title="Context">
@@ -160,9 +257,17 @@ export default function Command(
           title={`Town: ${activeTownName}`}
           subtitle={contextSubtitle}
           icon={{ source: "icon.png" }}
-          accessories={activeTimezone ? [{ text: activeTimezone }] : []}
+          accessories={[
+            { text: `${zones.length} active` },
+            ...(activeTimezone ? [{ text: activeTimezone }] : []),
+          ]}
           actions={
             <ActionPanel>
+              <Action
+                title="Use Auto (Near Me)"
+                onAction={() => setSelectedTownValue(AUTO_TOWN_VALUE)}
+                icon={Icon.Pin}
+              />
               <Action
                 title="Use Kids and Family Query"
                 onAction={() => setSearchText("kids and family events this weekend")}
@@ -289,6 +394,16 @@ export default function Command(
           <List.Item
             title="Unable to load TownSpot events"
             subtitle={errorMessage}
+            icon={Icon.ExclamationMark}
+          />
+        </List.Section>
+      ) : null}
+
+      {zonesError ? (
+        <List.Section title="Town Selector">
+          <List.Item
+            title="Active towns unavailable"
+            subtitle={zonesError}
             icon={Icon.ExclamationMark}
           />
         </List.Section>
