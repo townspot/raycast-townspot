@@ -34,19 +34,6 @@ const toActiveZoneOption = (zone: RawZone): ActiveZoneOption | null => {
   };
 };
 
-const uniqueBySlug = (zones: ActiveZoneOption[]): ActiveZoneOption[] => {
-  const seen = new Set<string>();
-  const result: ActiveZoneOption[] = [];
-
-  for (const zone of zones) {
-    if (seen.has(zone.slug)) continue;
-    seen.add(zone.slug);
-    result.push(zone);
-  }
-
-  return result;
-};
-
 const fetchFromEndpoint = async (endpoint: string): Promise<Response> =>
   fetch(endpoint, {
     headers: {
@@ -91,5 +78,5 @@ export const fetchActiveZones = async (
     .filter((item): item is ActiveZoneOption => Boolean(item))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  return uniqueBySlug(options);
+  return options;
 };
