@@ -14,7 +14,6 @@ import {
   groupEventsByDay,
   TimeWindow,
 } from "./lib/event-listing";
-import { buildGroundedSummary } from "./lib/grounded-summary";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
@@ -53,26 +52,16 @@ const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   return debounced;
 };
 
-const hasUuid = (value: string): boolean =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-
-const normalizeEventUrl = (rawUrl: string): string => {
+const resolveEventUrl = (rawUrl: string): string => {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "https://townspot.co";
   try {
-    const parsed = new URL(rawUrl);
-    const match = parsed.pathname.match(/^\/event\/([^/]+)$/i);
-    if (!match) return rawUrl;
-
-    const slugOrUuid = match[1];
-    if (hasUuid(slugOrUuid)) return rawUrl;
-    if (/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slugOrUuid)) {
-      return rawUrl;
-    }
-
-    return `${parsed.origin}/${slugOrUuid}`;
+    return new URL(value).toString();
   } catch {
-    return rawUrl;
+    if (value.startsWith("/")) {
+      return `https://townspot.co${value}`;
+    }
+    return `https://townspot.co/${value}`;
   }
 };
 
@@ -359,16 +348,6 @@ export default function Command(
     [categoryFilteredEvents, sectionTimezone, selectedTimeWindow],
   );
 
-  const summary = useMemo(
-    () =>
-      buildGroundedSummary({
-        townName: activeTownName,
-        query: queryForApi,
-        events: timeWindowEvents,
-      }),
-    [activeTownName, queryForApi, timeWindowEvents],
-  );
-
   const daySections = useMemo(
     () => groupEventsByDay(timeWindowEvents, sectionTimezone),
     [timeWindowEvents, sectionTimezone],
@@ -394,6 +373,10 @@ export default function Command(
     setHomeZoneId(null);
     setResponse(null);
     await LocalStorage.removeItem(HOME_ZONE_STORAGE_KEY);
+  };
+
+  const applyTimeWindow = (timeWindow: TimeWindow): void => {
+    setSelectedTimeWindow(timeWindow);
   };
 
   return (
@@ -459,10 +442,103 @@ export default function Command(
         </List.Section>
       ) : (
         <>
-          <List.Section title="Filters">
+          {daySections.length ? (
+            daySections.map((section) => (
+              <List.Section key={section.id} title={section.title}>
+                {section.events.map((event) => {
+                  const resolvedEventUrl = resolveEventUrl(event.url);
+                  const timeLabel = formatEventTime(event.startTime, sectionTimezone);
+                  const categoriesLabel = toCategoriesLabel(event.tags);
+                  const subtitleBase = event.venueName || activeTownName;
+                  const subtitle = categoriesLabel
+                    ? `${subtitleBase} · ${categoriesLabel}`
+                    : subtitleBase;
+
+                  return (
+                    <List.Item
+                      key={event.id}
+                      title={event.title}
+                      subtitle={subtitle}
+                      icon={{ source: "icon.png" }}
+                      accessories={timeLabel ? [{ text: timeLabel }] : []}
+                      actions={
+                        <ActionPanel>
+                          <ActionPanel.Section title="Event">
+                            <Action.Push
+                              title="View Event Details"
+                              target={
+                                <EventDetailView
+                                  event={event}
+                                  timezone={sectionTimezone}
+                                  url={resolvedEventUrl}
+                                  apiBaseUrl={preferences.apiBaseUrl}
+                                />
+                              }
+                            />
+                            <Action.OpenInBrowser
+                              title="Open on Website"
+                              url={resolvedEventUrl}
+                            />
+                            <Action.CopyToClipboard
+                              title="Copy Event Link"
+                              content={resolvedEventUrl}
+                            />
+                          </ActionPanel.Section>
+                          <ActionPanel.Section title="Filters">
+                            <Action
+                              title="Show Events Happening Now"
+                              onAction={() => applyTimeWindow("now")}
+                            />
+                            <Action
+                              title="Show Today + Tomorrow"
+                              onAction={() => applyTimeWindow("today_tomorrow")}
+                            />
+                            <Action
+                              title="Show Kids Events"
+                              onAction={() => setSelectedCategory("Kids")}
+                            />
+                            <Action
+                              title="Show All Categories"
+                              onAction={() => setSelectedCategory(CATEGORY_ALL)}
+                            />
+                          </ActionPanel.Section>
+                        </ActionPanel>
+                      }
+                    />
+                  );
+                })}
+              </List.Section>
+            ))
+          ) : (
+            <List.Section title="Today">
+              <List.Item
+                title="No events for this search"
+                subtitle="Try broadening your query or switch to another time window."
+                icon={Icon.Calendar}
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Show All Upcoming"
+                      onAction={() => applyTimeWindow("all_upcoming")}
+                    />
+                    <Action
+                      title="Search This Weekend"
+                      onAction={() => setSearchText("what's on this weekend")}
+                    />
+                    <Action
+                      title="Show Events Happening Now"
+                      onAction={() => applyTimeWindow("now")}
+                    />
+                  </ActionPanel>
+                }
+              />
+            </List.Section>
+          )}
+
+          <List.Section title="Browse">
             <List.Item
               title="When"
-              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch quickly.`}
+              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch.`}
               icon={Icon.Clock}
               accessories={[{ text: `${timeWindowEvents.length} events` }]}
               actions={
@@ -471,20 +547,17 @@ export default function Command(
                     <Action
                       key={option.id}
                       title={`Show ${option.title}`}
-                      onAction={() => {
-                        setSelectedTimeWindow(option.id);
-                        setSearchText(option.queryHint);
-                      }}
+                      onAction={() => applyTimeWindow(option.id)}
                     />
                   ))}
                 </ActionPanel>
               }
             />
             <List.Item
-              title="Filter by Category"
+              title="Category"
               subtitle={
                 selectedCategory === CATEGORY_ALL
-                  ? "All categories. Press Enter to choose (Kids, Music, Free, ...)"
+                  ? "All categories. Press Enter to choose."
                   : `${selectedCategory}. Press Enter to change.`
               }
               icon={Icon.Tag}
@@ -512,75 +585,6 @@ export default function Command(
             />
           </List.Section>
 
-          {daySections.length ? (
-            daySections.map((section) => (
-              <List.Section key={section.id} title={section.title}>
-                {section.events.map((event) => {
-                  const normalizedEventUrl = normalizeEventUrl(event.url);
-                  const timeLabel = formatEventTime(event.startTime, sectionTimezone);
-                  const categoriesLabel = toCategoriesLabel(event.tags);
-                  const subtitleBase = event.venueName || activeTownName;
-                  const subtitle = categoriesLabel
-                    ? `${subtitleBase} · ${categoriesLabel}`
-                    : subtitleBase;
-
-                  return (
-                    <List.Item
-                      key={event.id}
-                      title={event.title}
-                      subtitle={subtitle}
-                      icon={{ source: "icon.png" }}
-                      accessories={timeLabel ? [{ text: timeLabel }] : []}
-                      actions={
-                        <ActionPanel>
-                          <Action.Push
-                            title="View Event Details"
-                            target={
-                              <EventDetailView
-                                event={event}
-                                timezone={sectionTimezone}
-                                url={normalizedEventUrl}
-                                apiBaseUrl={preferences.apiBaseUrl}
-                              />
-                            }
-                          />
-                          <Action.OpenInBrowser
-                            title="Open on Website"
-                            url={normalizedEventUrl}
-                          />
-                          <Action.CopyToClipboard
-                            title="Copy Event Link"
-                            content={normalizedEventUrl}
-                          />
-                        </ActionPanel>
-                      }
-                    />
-                  );
-                })}
-              </List.Section>
-            ))
-          ) : (
-            <List.Section title="Today">
-              <List.Item
-                title="No events for this search"
-                subtitle="Try broadening your query or switch to another time window."
-                icon={Icon.Calendar}
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title="Show All Upcoming"
-                      onAction={() => setSelectedTimeWindow("all_upcoming")}
-                    />
-                    <Action
-                      title="Search This Weekend"
-                      onAction={() => setSearchText("what's on this weekend")}
-                    />
-                  </ActionPanel>
-                }
-              />
-            </List.Section>
-          )}
-
           <List.Section title="Home Zone">
             <List.Item
               title={`Home Zone: ${activeTownName}`}
@@ -607,19 +611,6 @@ export default function Command(
                   <Action.CopyToClipboard
                     title="Copy Town Slug"
                     content={activeTownSlug}
-                  />
-                </ActionPanel>
-              }
-            />
-            <List.Item
-              title={summary.title}
-              subtitle={summary.subtitle}
-              icon={Icon.Stars}
-              actions={
-                <ActionPanel>
-                  <Action.CopyToClipboard
-                    title="Copy Summary"
-                    content={`${summary.title}. ${summary.subtitle}`}
                   />
                 </ActionPanel>
               }
