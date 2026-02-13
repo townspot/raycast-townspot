@@ -35,6 +35,7 @@ If you see `fetch failed`, check:
   - Opens with today's listings by default.
   - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
   - Use up/down arrows to browse event results.
+  - Use the top `Category` filter row to quickly toggle categories (including kids/family).
   - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).
   - Events are grouped by day sections (Today, Tomorrow, etc.) with time shown on the right.

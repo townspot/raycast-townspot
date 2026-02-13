@@ -92,6 +92,21 @@ const toCategoriesLabel = (tags: string[]): string =>
     .slice(0, 3)
     .join(", ");
 
+const CATEGORY_ALL = "All";
+
+const normalizeCategory = (value: string): string =>
+  value.trim().toLowerCase();
+
+const eventMatchesCategory = (tags: string[], selectedCategory: string): boolean => {
+  if (selectedCategory === CATEGORY_ALL) return true;
+  const normalizedSelected = normalizeCategory(selectedCategory);
+  const normalizedTags = tags.map((tag) => normalizeCategory(tag));
+  if (normalizedSelected === "kids") {
+    return normalizedTags.includes("kids") || normalizedTags.includes("family");
+  }
+  return normalizedTags.includes(normalizedSelected);
+};
+
 export default function Command(
   props: LaunchProps<{ arguments: AskArguments }>,
 ): JSX.Element {
@@ -113,6 +128,7 @@ export default function Command(
   const [resolvingTown, setResolvingTown] = useState(true);
   const [response, setResponse] = useState<RaycastResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
   const debouncedSearchText = useDebouncedValue(searchText, 350);
 
   useEffect(() => {
@@ -262,19 +278,48 @@ export default function Command(
   const activeTownSlug = effectiveTownSlug || "";
   const activeTimezone =
     response?.town?.slug === activeTownSlug ? response?.town?.timezone || "" : "";
+  const categoryOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const event of response?.events || []) {
+      for (const tag of event.tags || []) {
+        const value = String(tag || "").trim();
+        if (!value) continue;
+        values.add(value);
+      }
+    }
+
+    const sorted = Array.from(values).sort((a, b) => a.localeCompare(b));
+    const hasKids = sorted.some((value) => normalizeCategory(value) === "kids");
+    const hasFamily = sorted.some((value) => normalizeCategory(value) === "family");
+    if (!hasKids && hasFamily) {
+      sorted.unshift("Kids");
+    }
+    return [CATEGORY_ALL, ...sorted];
+  }, [response]);
+  const filteredEvents = useMemo(
+    () =>
+      (response?.events || []).filter((event) =>
+        eventMatchesCategory(event.tags || [], selectedCategory),
+      ),
+    [response, selectedCategory],
+  );
+  useEffect(() => {
+    if (categoryOptions.includes(selectedCategory)) return;
+    setSelectedCategory(CATEGORY_ALL);
+  }, [categoryOptions, selectedCategory]);
   const summary = useMemo(
     () =>
       buildGroundedSummary({
         townName: activeTownName,
         query: debouncedSearchText,
-        events: response?.events || [],
+        events: filteredEvents,
       }),
-    [activeTownName, debouncedSearchText, response],
+    [activeTownName, debouncedSearchText, filteredEvents],
   );
   const sectionTimezone = response?.town?.timezone || "Europe/London";
   const daySections = useMemo(
-    () => groupEventsByDay(response?.events || [], sectionTimezone),
-    [response, sectionTimezone],
+    () => groupEventsByDay(filteredEvents, sectionTimezone),
+    [filteredEvents, sectionTimezone],
   );
 
   const sourceLabel =
@@ -316,6 +361,30 @@ export default function Command(
       }
       throttle
     >
+      <List.Section title="Filters">
+        <List.Item
+          title={`Category: ${selectedCategory}`}
+          subtitle="Press Enter to switch category"
+          icon={Icon.Tag}
+          accessories={[{ text: `${filteredEvents.length} results` }]}
+          actions={
+            <ActionPanel>
+              {categoryOptions.map((category) => (
+                <Action
+                  key={category}
+                  title={`Show ${category}`}
+                  onAction={() => setSelectedCategory(category)}
+                />
+              ))}
+              <Action
+                title="Clear Category Filter"
+                onAction={() => setSelectedCategory(CATEGORY_ALL)}
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+
       {daySections.length ? (
         daySections.map((section) => (
           <List.Section key={section.id} title={section.title}>
