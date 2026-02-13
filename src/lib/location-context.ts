@@ -198,6 +198,7 @@ const fetchNearestZoneByDistance = async (
 ): Promise<{ slug: string; name: string } | null> => {
   const normalizedBaseUrl = normalizeApiBaseUrl(apiBaseUrl).replace(/\/$/, "");
   const payload = await fetchJsonWithFallback([
+    `${normalizedBaseUrl}/locations/list?includeHidden=true`,
     `${normalizedBaseUrl}/locations/list`,
     `${normalizedBaseUrl}/list`,
   ]);

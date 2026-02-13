@@ -32,9 +32,10 @@ If you see `fetch failed`, check:
 ## Command
 
 - **Ask TownSpot** (`ask`)
-  - Opens with today's listings by default.
+  - Opens with upcoming listings and defaults to `Today + Tomorrow`.
   - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
   - Use up/down arrows to browse event results.
+  - Use the top `When` filter row to jump between Today, Today + Tomorrow, Next 3/7 Days, and This Week.
   - Use the top `Category` filter row to quickly toggle categories (including kids/family).
   - Pick your town from the dropdown selector (`Auto (Near Me)` + visible active towns).
   - Run quick presets (Tonight, Weekend, Kids and Family, Free, Live Music).

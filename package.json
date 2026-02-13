@@ -37,14 +37,12 @@
           "name": "query",
           "type": "text",
           "required": false,
-          "default": "What's on in kentish-town tonight?",
           "placeholder": "What are people doing tonight?"
         },
         {
           "name": "townSlug",
           "type": "text",
           "required": false,
-          "default": "kentish-town",
           "placeholder": "kentish-town"
         }
       ],

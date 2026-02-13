@@ -7,7 +7,12 @@ import {
   getPreferenceValues,
 } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
-import { formatEventTime, groupEventsByDay } from "./lib/event-listing";
+import {
+  filterEventsByTimeWindow,
+  formatEventTime,
+  groupEventsByDay,
+  TimeWindow,
+} from "./lib/event-listing";
 import { buildGroundedSummary } from "./lib/grounded-summary";
 import { resolveTownContext, TownContext } from "./lib/location-context";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
@@ -28,7 +33,7 @@ type Preferences = {
 };
 
 const DEFAULT_QUERY = "";
-const FALLBACK_API_QUERY = "what's on today";
+const FALLBACK_API_QUERY = "what's on this week";
 const AUTO_TOWN_VALUE = "__auto__";
 const ZONE_VALUE_PREFIX = "zone:";
 
@@ -94,9 +99,31 @@ const toCategoriesLabel = (tags: string[]): string =>
     .join(", ");
 
 const CATEGORY_ALL = "All";
+const DEFAULT_TIME_WINDOW: TimeWindow = "today_tomorrow";
+
+type TimeWindowOption = {
+  id: TimeWindow;
+  title: string;
+  queryHint: string;
+};
+
+const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
+  { id: "today", title: "Today", queryHint: "what's on today" },
+  {
+    id: "today_tomorrow",
+    title: "Today + Tomorrow",
+    queryHint: "what's on today and tomorrow",
+  },
+  { id: "next_3_days", title: "Next 3 Days", queryHint: "what's on over the next 3 days" },
+  { id: "next_7_days", title: "Next 7 Days", queryHint: "what's on over the next 7 days" },
+  { id: "this_week", title: "This Week", queryHint: "what's on this week" },
+];
 
 const normalizeCategory = (value: string): string =>
   value.trim().toLowerCase();
+
+const timeWindowLabel = (value: TimeWindow): string =>
+  TIME_WINDOW_OPTIONS.find((option) => option.id === value)?.title || "Today + Tomorrow";
 
 const eventMatchesCategory = (tags: string[], selectedCategory: string): boolean => {
   if (selectedCategory === CATEGORY_ALL) return true;
@@ -130,6 +157,7 @@ export default function Command(
   const [response, setResponse] = useState<RaycastResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState<TimeWindow>(DEFAULT_TIME_WINDOW);
   const debouncedSearchText = useDebouncedValue(searchText, 350);
   const queryForApi = useMemo(() => {
     const trimmed = debouncedSearchText.trim();
@@ -247,6 +275,7 @@ export default function Command(
           townSlug: effectiveTownSlug,
           locale: preferences.locale,
           apiBaseUrl: preferences.apiBaseUrl,
+          limit: 20,
           conversation: [],
         });
         if (cancelled) return;
@@ -301,7 +330,7 @@ export default function Command(
     }
     return [CATEGORY_ALL, ...sorted];
   }, [response]);
-  const filteredEvents = useMemo(
+  const categoryFilteredEvents = useMemo(
     () =>
       (response?.events || []).filter((event) =>
         eventMatchesCategory(event.tags || [], selectedCategory),
@@ -312,19 +341,28 @@ export default function Command(
     if (categoryOptions.includes(selectedCategory)) return;
     setSelectedCategory(CATEGORY_ALL);
   }, [categoryOptions, selectedCategory]);
+  const sectionTimezone = response?.town?.timezone || "Europe/London";
+  const timeWindowEvents = useMemo(
+    () =>
+      filterEventsByTimeWindow(
+        categoryFilteredEvents,
+        sectionTimezone,
+        selectedTimeWindow,
+      ),
+    [categoryFilteredEvents, sectionTimezone, selectedTimeWindow],
+  );
   const summary = useMemo(
     () =>
       buildGroundedSummary({
         townName: activeTownName,
         query: queryForApi,
-        events: filteredEvents,
+        events: timeWindowEvents,
       }),
-    [activeTownName, queryForApi, filteredEvents],
+    [activeTownName, queryForApi, timeWindowEvents],
   );
-  const sectionTimezone = response?.town?.timezone || "Europe/London";
   const daySections = useMemo(
-    () => groupEventsByDay(filteredEvents, sectionTimezone),
-    [filteredEvents, sectionTimezone],
+    () => groupEventsByDay(timeWindowEvents, sectionTimezone),
+    [timeWindowEvents, sectionTimezone],
   );
 
   const sourceLabel =
@@ -333,7 +371,10 @@ export default function Command(
         ? formatSourceLabel(townContext.source)
         : "resolving nearby town"
       : "selected from active towns";
-  const contextSubtitle = `${activeTownSlug || "unknown"} · ${sourceLabel}`;
+  const contextSubtitle =
+    selectedTownValue === AUTO_TOWN_VALUE && townContext?.source === "fallback"
+      ? "Auto Near Me is unavailable right now. Choose your Town from the dropdown above."
+      : `Currently using ${activeTownName} (${sourceLabel}).`;
 
   return (
     <List
@@ -343,7 +384,7 @@ export default function Command(
       onSearchTextChange={setSearchText}
       searchBarAccessory={
         <List.Dropdown
-          tooltip="Town"
+          tooltip="Town (Set Your Zone)"
           storeValue
           value={selectedTownValue}
           onChange={setSelectedTownValue}
@@ -368,6 +409,26 @@ export default function Command(
     >
       <List.Section title="Filters">
         <List.Item
+          title="When"
+          subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch quickly.`}
+          icon={Icon.Clock}
+          accessories={[{ text: `${timeWindowEvents.length} events` }]}
+          actions={
+            <ActionPanel>
+              {TIME_WINDOW_OPTIONS.map((option) => (
+                <Action
+                  key={option.id}
+                  title={`Show ${option.title}`}
+                  onAction={() => {
+                    setSelectedTimeWindow(option.id);
+                    setSearchText(option.queryHint);
+                  }}
+                />
+              ))}
+            </ActionPanel>
+          }
+        />
+        <List.Item
           title="Filter by Category"
           subtitle={
             selectedCategory === CATEGORY_ALL
@@ -377,7 +438,7 @@ export default function Command(
           icon={Icon.Tag}
           accessories={[
             { text: selectedCategory },
-            { text: `${filteredEvents.length} results` },
+            { text: `${timeWindowEvents.length} results` },
           ]}
           actions={
             <ActionPanel>
@@ -569,6 +630,16 @@ export default function Command(
             title="Active towns unavailable"
             subtitle={zonesError}
             icon={Icon.ExclamationMark}
+          />
+        </List.Section>
+      ) : null}
+
+      {selectedTownValue === AUTO_TOWN_VALUE && townContext?.source === "fallback" ? (
+        <List.Section title="Town Selector">
+          <List.Item
+            title="Auto Near Me unavailable"
+            subtitle="Use the Town dropdown above to set your zone manually."
+            icon={Icon.PinDisabled}
           />
         </List.Section>
       ) : null}
