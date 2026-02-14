@@ -81,6 +81,9 @@ const cleanCategoryLabel = (value: string): string =>
     .replace(/^[·•\-–—\s]+|[·•\-–—\s]+$/g, "")
     .trim();
 
+const isMeaningfulCategory = (value: string): boolean =>
+  /[\p{L}\p{N}]/u.test(value);
+
 const zoneActivityLabel = (zone: ActiveZoneOption): string => {
   if (Number.isFinite(zone.activeUsers)) {
     return `${zone.activeUsers} locals active`;
@@ -396,7 +399,7 @@ export default function Command(
       const tagParts = splitEventTags(event.tags || []);
       for (const tag of tagParts.categories) {
         const value = cleanCategoryLabel(tag);
-        if (!value) continue;
+        if (!value || !isMeaningfulCategory(value)) continue;
         values.add(value);
       }
     }
@@ -449,7 +452,7 @@ export default function Command(
   const categoryPillAccessories = useMemo(
     () =>
       categoryOptions
-        .filter((category) => category !== CATEGORY_ALL)
+        .filter((category) => category !== CATEGORY_ALL && isMeaningfulCategory(category))
         .slice(0, 6)
         .map((category) => ({
           tag: {
@@ -629,7 +632,7 @@ export default function Command(
                     onAction={() => applyCategory(CATEGORY_ALL)}
                   />
                   {categoryOptions
-                    .filter((category) => category !== CATEGORY_ALL)
+                    .filter((category) => category !== CATEGORY_ALL && isMeaningfulCategory(category))
                     .map((category) => (
                     <Action
                       key={category}
