@@ -2,7 +2,6 @@ import {
   Action,
   ActionPanel,
   Icon,
-  LaunchProps,
   List,
   LocalStorage,
   getPreferenceValues,
@@ -15,15 +14,10 @@ import {
   TimeWindow,
 } from "./lib/event-listing";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
-import { askTownspot, sanitizeTownSlug } from "./lib/townspot";
+import { askTownspot } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
 import { RaycastResponse } from "./types";
 import { EventDetailView } from "./views/event-detail-view";
-
-type AskArguments = {
-  query?: string;
-  townSlug?: string;
-};
 
 type Preferences = {
   apiBaseUrl: string;
@@ -35,11 +29,6 @@ const FALLBACK_API_QUERY = "what's on this week";
 const HOME_ZONE_STORAGE_KEY = "townspot-home-zone-id";
 const NO_ZONE_VALUE = "__unset__";
 const ZONE_VALUE_PREFIX = "zone:";
-
-const sanitizeQuery = (value: string | undefined): string => {
-  const trimmed = String(value || "").trim();
-  return trimmed ? trimmed : DEFAULT_QUERY;
-};
 
 const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   const [debounced, setDebounced] = useState(value);
@@ -118,11 +107,9 @@ const eventMatchesCategory = (tags: string[], selectedCategory: string): boolean
 };
 
 export default function Command(
-  props: LaunchProps<{ arguments: AskArguments }>,
 ): JSX.Element {
   const preferences = getPreferenceValues<Preferences>();
-  const initialTownSlug = sanitizeTownSlug(props.arguments.townSlug || "");
-  const initialQuery = sanitizeQuery(props.arguments.query);
+  const initialQuery = DEFAULT_QUERY;
 
   const [zones, setZones] = useState<ActiveZoneOption[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
@@ -215,16 +202,6 @@ export default function Command(
       return;
     }
 
-    if (initialTownSlug) {
-      const argumentZone = zones.find((zone) => zone.slug === initialTownSlug);
-      if (argumentZone) {
-        setSelectedTownValue(toZoneValue(argumentZone.id));
-        setHomeZoneId(argumentZone.id);
-        void LocalStorage.setItem(HOME_ZONE_STORAGE_KEY, String(argumentZone.id));
-        return;
-      }
-    }
-
     if (homeZoneId !== null) {
       const storedHomeZone = zones.find((zone) => zone.id === homeZoneId);
       if (storedHomeZone) {
@@ -234,7 +211,7 @@ export default function Command(
       setHomeZoneId(null);
       void LocalStorage.removeItem(HOME_ZONE_STORAGE_KEY);
     }
-  }, [homeZoneLoading, zonesLoading, zones, selectedTownValue, initialTownSlug, homeZoneId]);
+  }, [homeZoneLoading, zonesLoading, zones, selectedTownValue, homeZoneId]);
 
   const selectedZone = useMemo(
     () => {

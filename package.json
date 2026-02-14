@@ -32,20 +32,6 @@
       "mode": "view",
       "path": "ask",
       "keywords": ["events", "townspot", "weekend", "music"],
-      "arguments": [
-        {
-          "name": "query",
-          "type": "text",
-          "required": false,
-          "placeholder": "What are people doing tonight?"
-        },
-        {
-          "name": "townSlug",
-          "type": "text",
-          "required": false,
-          "placeholder": "kentish-town"
-        }
-      ],
       "preferences": [
         {
           "name": "apiBaseUrl",
