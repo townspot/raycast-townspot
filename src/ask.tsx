@@ -74,10 +74,10 @@ const toCategoriesLabel = (tags: string[]): string =>
 
 const zoneActivityLabel = (zone: ActiveZoneOption): string => {
   if (Number.isFinite(zone.activeUsers)) {
-    return `${zone.activeUsers} Local's active`;
+    return `${zone.activeUsers} locals active`;
   }
   if (Number.isFinite(zone.weeklyEventsCount)) {
-    return `${zone.weeklyEventsCount} Local's active`;
+    return `${zone.weeklyEventsCount} locals active`;
   }
   return "";
 };
@@ -376,8 +376,8 @@ export default function Command(
   const activeTownName = selectedZone?.name || "Home Zone";
   const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
-    ? `${activeThisWeek} Local's active`
-    : "Local's active";
+    ? `${activeThisWeek} locals active`
+    : "locals active";
   const selectedZoneTitle = selectedZone ? zoneDropdownTitle(selectedZone) : "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
