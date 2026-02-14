@@ -34,14 +34,6 @@
       "keywords": ["events", "townspot", "weekend", "music"],
       "preferences": [
         {
-          "name": "apiBaseUrl",
-          "title": "TownSpot API Base URL",
-          "description": "Base URL for the TownSpot API",
-          "type": "textfield",
-          "required": true,
-          "default": "https://townspot.co/api"
-        },
-        {
           "name": "locale",
           "title": "Locale",
           "description": "API locale (en-GB, es-ES, ca-ES)",

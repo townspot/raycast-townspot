@@ -15,8 +15,6 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `ask` command */
   export type Ask = ExtensionPreferences & {
-  /** TownSpot API Base URL - Base URL for the TownSpot API */
-  "apiBaseUrl": string,
   /** Locale - API locale (en-GB, es-ES, ca-ES) */
   "locale": string
 }

@@ -25,7 +25,6 @@ import { EventDetailView } from "./views/event-detail-view";
 import { TimeWindowPickerView } from "./views/time-window-picker-view";
 
 type Preferences = {
-  apiBaseUrl: string;
   locale: string;
 };
 
@@ -36,6 +35,7 @@ const NO_ZONE_VALUE = "__unset__";
 const ZONE_VALUE_PREFIX = "zone:";
 const SMALL_DOT = "·";
 const API_EVENT_FETCH_LIMIT = 120;
+const PROD_API_BASE_URL = "https://townspot.co/api";
 
 const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   const [debounced, setDebounced] = useState(value);
@@ -303,7 +303,7 @@ export default function Command(
       setZonesError("");
       try {
         const activeZones = await fetchActiveZones(
-          preferences.apiBaseUrl,
+          PROD_API_BASE_URL,
         );
         if (cancelled) return;
         setZones(activeZones);
@@ -325,7 +325,7 @@ export default function Command(
     return () => {
       cancelled = true;
     };
-  }, [preferences.apiBaseUrl, preferences.locale]);
+  }, []);
 
   useEffect(() => {
     if (homeZoneLoading || zonesLoading) return;
@@ -383,7 +383,7 @@ export default function Command(
           query: queryForApi,
           townSlug: effectiveTownSlug,
           locale: preferences.locale,
-          apiBaseUrl: preferences.apiBaseUrl,
+          apiBaseUrl: PROD_API_BASE_URL,
           limit: API_EVENT_FETCH_LIMIT,
           conversation: [],
         });
@@ -418,7 +418,6 @@ export default function Command(
     };
   }, [
     queryForApi,
-    preferences.apiBaseUrl,
     preferences.locale,
     effectiveTownSlug,
     selectionHydrated,
@@ -431,8 +430,8 @@ export default function Command(
   const activeTownName = selectedZone?.name || "Hometown";
   const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
-    ? `${activeThisWeek} locals active`
-    : "locals active";
+    ? `${activeThisWeek} locals active this week`
+    : "locals active this week";
   const selectedZoneTitle = selectedZone ? zoneDropdownTitle(selectedZone) : "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
@@ -776,7 +775,7 @@ export default function Command(
                                   event={event}
                                   timezone={sectionTimezone}
                                   url={resolvedEventUrl}
-                                  apiBaseUrl={preferences.apiBaseUrl}
+                                  apiBaseUrl={PROD_API_BASE_URL}
                                 />
                               }
                             />

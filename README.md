@@ -18,16 +18,12 @@ npm run dev
 
 If your Raycast CLI binary is not on PATH, `npm run dev` uses the local `ray` CLI bundled in the extension dependency.
 
-## Local API
+## API + Preferences
 
-Use this in command preferences:
-- API Base URL: `http://localhost:3000/api`
-- Locale: `en-GB`
+- API is hardcoded to production: `https://townspot.co/api`.
+- The only command preference is `Locale` (`en-GB`, `es-ES`, `ca-ES`).
 
-If you see `fetch failed`, check:
-- Server is running: `curl http://localhost:3000/api/raycast/query` returns JSON when using a valid POST body.
-- Preference URL includes protocol (`http://` or `https://`).
-- You are not using `https://localhost:3000` without a local cert (use `http://localhost:3000`).
+For local API testing, temporarily change `PROD_API_BASE_URL` in `src/ask.tsx`.
 
 ## Command
 
