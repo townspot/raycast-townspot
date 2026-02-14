@@ -5,7 +5,6 @@ import {
   EventDetails,
   fetchEventDetails,
   googleMapsUrl,
-  staticMapPreviewUrl,
 } from "../lib/event-details";
 import { formatEventTime } from "../lib/event-listing";
 import { splitEventTags } from "../lib/event-tags";
@@ -33,6 +32,30 @@ const formatDateTime = (value: string | undefined | null, timezone: string): str
   }).format(parsed);
 };
 
+const formatClock = (value: string | undefined | null, timezone: string): string => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone || "Europe/London",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
+};
+
+const formatDateKey = (value: string | undefined | null, timezone: string): string => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone || "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+};
+
 const formatTimeRange = (
   startValue: string | undefined | null,
   endValue: string | undefined | null,
@@ -40,15 +63,46 @@ const formatTimeRange = (
 ): string => {
   const start = formatDateTime(startValue, timezone);
   if (!endValue) return start;
+
   const end = formatDateTime(endValue, timezone);
   if (start === "TBC") return end;
-  return `${start} -> ${end}`;
+  if (end === "TBC") return start;
+  if (start === end) return start;
+
+  const sameDay = formatDateKey(startValue, timezone) === formatDateKey(endValue, timezone);
+  if (sameDay) {
+    const endClock = formatClock(endValue, timezone);
+    return endClock ? `${start} to ${endClock}` : start;
+  }
+
+  return `${start} to ${end}`;
 };
 
 const escapeMarkdown = (value: string): string =>
   value
     .replace(/\\/g, "\\\\")
     .replace(/([*_`[\\]()#+\-.!])/g, "\\$1");
+
+const buildMarkdown = (
+  title: string,
+  description: string | null,
+  imageUrl: string | null,
+): string => {
+  const blocks = [`# ${escapeMarkdown(title)}`];
+  if (imageUrl) {
+    blocks.push("", `![Event image](${imageUrl})`);
+  }
+  if (description) {
+    blocks.push("", description);
+  }
+  return blocks.join("\n");
+};
+
+const categoryList = (details: EventDetails | null, event: RaycastEvent): string[] => {
+  const fallbackCategories = splitEventTags(event.tags).categories;
+  const values = details?.categories?.length ? details.categories : fallbackCategories;
+  return (values || []).filter(Boolean);
+};
 
 const fallbackVenue = (details: EventDetails | null, event: RaycastEvent): string => {
   return details?.locationName || details?.venueDescription || event.venueName || "TBC";
@@ -71,50 +125,6 @@ const priceLabel = (details: EventDetails | null): string | null => {
   if (details?.isFree === true) return "Free";
   if (details?.isFree === false) return "Paid";
   return null;
-};
-
-const categoryList = (details: EventDetails | null, event: RaycastEvent): string[] => {
-  const fallbackCategories = splitEventTags(event.tags).categories;
-  const values = details?.categories?.length ? details.categories : fallbackCategories;
-  return (values || []).filter(Boolean);
-};
-
-const categoriesLabel = (details: EventDetails | null, event: RaycastEvent): string => {
-  const categories = categoryList(details, event);
-  return categories.length ? categories.join(", ") : "None listed";
-};
-
-const buildMarkdown = (
-  title: string,
-  description: string | null,
-  imageUrl: string | null,
-  metaRows: string[],
-  mapImageUrl: string | null,
-  mapLinksMarkdown: string | null,
-): string => {
-  const blocks = [`# ${escapeMarkdown(title)}`];
-
-  if (imageUrl) {
-    blocks.push("", `![Event image](${imageUrl})`);
-  }
-
-  if (metaRows.length) {
-    blocks.push("", ...metaRows.map((row) => escapeMarkdown(row)));
-  }
-
-  if (mapImageUrl) {
-    blocks.push("", `![Map preview](${mapImageUrl})`);
-  }
-
-  if (mapLinksMarkdown) {
-    blocks.push("", mapLinksMarkdown);
-  }
-
-  if (description) {
-    blocks.push("", description);
-  }
-
-  return blocks.join("\n");
 };
 
 const buildShareMessage = (
@@ -234,10 +244,6 @@ export const EventDetailView = ({
   const startValue = details?.startTimeLocal || details?.startTime || event.startTime;
   const endValue = details?.endTimeLocal || details?.endTime || event.endTime;
   const venueLabel = fallbackVenue(details, event);
-  const addressLabel = fallbackAddress(details);
-  const recurring = recurringLabel(event);
-  const price = priceLabel(details);
-  const categoryLabel = categoriesLabel(details, event);
   const timeRangeLabel = formatTimeRange(startValue, endValue, effectiveTimezone);
 
   const mapsLabel = details?.locationName || details?.locationAddress || event.venueName;
@@ -247,53 +253,18 @@ export const EventDetailView = ({
     typeof details?.lng === "number" &&
     Number.isFinite(details.lng);
 
-  const googleUrl = hasCoordinates
-    ? googleMapsUrl(details.lat as number, details.lng as number, mapsLabel)
-    : null;
   const appleUrl = hasCoordinates
     ? appleMapsUrl(details.lat as number, details.lng as number, mapsLabel)
     : null;
-  const mapImageUrl = hasCoordinates
-    ? staticMapPreviewUrl(details.lat as number, details.lng as number)
+  const googleUrl = hasCoordinates
+    ? googleMapsUrl(details.lat as number, details.lng as number, mapsLabel)
     : null;
-
-  const mapLinksMarkdown =
-    googleUrl && appleUrl
-      ? `[Open in Apple Maps](${appleUrl}) | [Open in Google Maps](${googleUrl})`
-      : null;
 
   const detailMarkdown = useMemo(() => {
     const description = details?.description || null;
     const imageUrl = details?.imageUrl || details?.mainImgUrl || null;
-    const metaRows = [
-      `🕒 ${timeRangeLabel}`,
-      `📍 ${venueLabel}`,
-      addressLabel ? `🧭 ${addressLabel}` : "",
-      recurring ? `🔁 ${recurring}` : "",
-      categoryLabel && categoryLabel !== "None listed" ? `🏷️ ${categoryLabel}` : "",
-      price ? `💸 ${price}` : "",
-    ].filter(Boolean);
-
-    return buildMarkdown(
-      details?.title || event.title,
-      description,
-      imageUrl,
-      metaRows,
-      mapImageUrl,
-      mapLinksMarkdown,
-    );
-  }, [
-    details,
-    event.title,
-    timeRangeLabel,
-    venueLabel,
-    addressLabel,
-    recurring,
-    categoryLabel,
-    price,
-    mapImageUrl,
-    mapLinksMarkdown,
-  ]);
+    return buildMarkdown(details?.title || event.title, description, imageUrl);
+  }, [details, event.title]);
 
   const legacyTimeLabel = formatEventTime(event.startTime, effectiveTimezone);
   const shareMessage = buildShareMessage(

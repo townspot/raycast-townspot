@@ -107,17 +107,3 @@ export const appleMapsUrl = (
   const q = label || `${lat},${lng}`;
   return `https://maps.apple.com/?ll=${encodeURIComponent(`${lat},${lng}`)}&q=${encodeURIComponent(q)}`;
 };
-
-export const staticMapPreviewUrl = (
-  lat: number,
-  lng: number,
-): string => {
-  const center = `${lat},${lng}`;
-  return (
-    "https://staticmap.openstreetmap.de/staticmap.php" +
-    `?center=${encodeURIComponent(center)}` +
-    "&zoom=15" +
-    "&size=900x360" +
-    `&markers=${encodeURIComponent(`${lat},${lng},lightblue1`)}`
-  );
-};
