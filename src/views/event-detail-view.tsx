@@ -100,7 +100,10 @@ const escapeMarkdown = (value: string): string =>
 
 const sanitizeDescription = (value: string | null): string | null => {
   if (!value) return null;
-  const lines = value.split(/\r?\n/);
+  const normalizedInput = value
+    .replace(/(https?:\/\/)\s+/gi, "$1")
+    .replace(/(https?:\/\/)\n+/gi, "$1");
+  const lines = normalizedInput.split(/\r?\n/);
   const cleaned = lines.filter((line) => {
     const text = line.trim();
     if (!text) return true;
