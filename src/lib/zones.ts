@@ -5,6 +5,8 @@ export type ActiveZoneOption = {
   name: string;
   slug: string;
   countryCode?: string;
+  activeUsers?: number;
+  weeklyEventsCount?: number;
 };
 
 type RawZone = {
@@ -13,6 +15,8 @@ type RawZone = {
   slug?: string;
   country_code?: string;
   countryCode?: string;
+  activeUsers?: number | string;
+  weeklyEventsCount?: number | string;
   active?: boolean;
   hidden?: boolean;
 };
@@ -25,12 +29,18 @@ const toActiveZoneOption = (zone: RawZone): ActiveZoneOption | null => {
   if (!Number.isFinite(id) || !slug || !name) return null;
   if (zone.hidden === true) return null;
   if (zone.active === false) return null;
+  const activeUsers = Number(zone.activeUsers);
+  const weeklyEventsCount = Number(zone.weeklyEventsCount);
 
   return {
     id,
     name,
     slug,
     countryCode: zone.country_code || zone.countryCode || undefined,
+    activeUsers: Number.isFinite(activeUsers) ? activeUsers : undefined,
+    weeklyEventsCount: Number.isFinite(weeklyEventsCount)
+      ? weeklyEventsCount
+      : undefined,
   };
 };
 

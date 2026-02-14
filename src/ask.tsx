@@ -16,7 +16,6 @@ import {
   TimeWindow,
 } from "./lib/event-listing";
 import { splitEventTags } from "./lib/event-tags";
-import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
 import { RaycastResponse } from "./types";
@@ -109,6 +108,17 @@ const eventMatchesCategory = (tags: string[], selectedCategory: string): boolean
   return normalizedTags.includes(normalizedSelected);
 };
 
+const inferCategoryFromQuery = (value: string): string | null => {
+  const query = normalizeWindowQuery(value);
+  if (!query) return null;
+  if (/\b(kids?|children|child|baby|babies|family|toddler|toddlers)\b/.test(query)) return "Kids";
+  if (/\b(music|live|dj|concert|gig)\b/.test(query)) return "Music";
+  if (/\b(food|eat|dinner|lunch|cafe|restaurant)\b/.test(query)) return "Food";
+  if (/\b(comedy|stand\s?up|comic)\b/.test(query)) return "Comedy";
+  if (/\b(art|gallery|museum|exhibit)\b/.test(query)) return "Art";
+  return null;
+};
+
 const normalizeWindowQuery = (value: string): string =>
   String(value || "")
     .toLowerCase()
@@ -168,6 +178,17 @@ export default function Command(
     if (!inferred || inferred === selectedTimeWindow) return;
     setSelectedTimeWindow(inferred);
   }, [debouncedSearchText, selectedTimeWindow]);
+
+  useEffect(() => {
+    const inferred = inferCategoryFromQuery(debouncedSearchText);
+    if (inferred && inferred !== selectedCategory) {
+      setSelectedCategory(inferred);
+      return;
+    }
+    if (!inferred && debouncedSearchText.trim().length > 0 && selectedCategory !== CATEGORY_ALL) {
+      setSelectedCategory(CATEGORY_ALL);
+    }
+  }, [debouncedSearchText, selectedCategory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,8 +341,10 @@ export default function Command(
   const responseForActiveTown =
     response?.town?.slug === effectiveTownSlug ? response : null;
   const activeTownName = selectedZone?.name || "Home Zone";
-  const activeTownSlug = effectiveTownSlug || "";
-  const activeTimezone = responseForActiveTown?.town?.timezone || "";
+  const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
+  const activeThisWeekLabel = Number.isFinite(activeThisWeek)
+    ? `${activeThisWeek} active this week`
+    : "Active this week";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
   const categoryOptions = useMemo(() => {
@@ -372,6 +395,22 @@ export default function Command(
     () => groupEventsByDay(timeWindowEvents, sectionTimezone),
     [timeWindowEvents, sectionTimezone],
   );
+  const categoryPillAccessories = useMemo(
+    () =>
+      categoryOptions
+        .filter((category) => category !== CATEGORY_ALL)
+        .slice(0, 6)
+        .map((category) => ({
+          tag: {
+            value: category,
+            color:
+              normalizeCategory(category) === normalizeCategory(selectedCategory)
+                ? Color.Blue
+                : Color.SecondaryText,
+          },
+        })),
+    [categoryOptions, selectedCategory],
+  );
 
   const setHomeZone = async (zone: ActiveZoneOption): Promise<void> => {
     setSelectedTownValue(toZoneValue(zone.id));
@@ -388,20 +427,13 @@ export default function Command(
     await setHomeZone(zone);
   };
 
-  const resetHomeZone = async (): Promise<void> => {
-    setSelectedTownValue(NO_ZONE_VALUE);
-    setHomeZoneId(null);
-    setResponse(null);
-    await LocalStorage.removeItem(HOME_ZONE_STORAGE_KEY);
-  };
-
   const applyTimeWindow = (timeWindow: TimeWindow): void => {
     setSelectedTimeWindow(timeWindow);
   };
 
   return (
     <List
-      navigationTitle={needsHomeZone ? "TownSpot" : `${activeTownName} · TownSpot`}
+      navigationTitle={needsHomeZone ? "TownSpot" : `${activeTownName} · ${activeThisWeekLabel}`}
       isLoading={loading || zonesLoading || homeZoneLoading}
       searchBarPlaceholder={
         !selectionHydrated
@@ -427,7 +459,7 @@ export default function Command(
                 ? "Loading Home Zone..."
                 : needsHomeZone
                   ? "Set Home Zone..."
-                  : "Change Home Zone..."
+                  : `${activeTownName} · ${activeThisWeekLabel}`
             }
             icon={Icon.Pin}
           />
@@ -437,6 +469,13 @@ export default function Command(
                 key={zone.id}
                 value={toZoneValue(zone.id)}
                 title={zone.name}
+                subtitle={
+                  Number.isFinite(zone.activeUsers)
+                    ? `${zone.activeUsers} active this week`
+                    : Number.isFinite(zone.weeklyEventsCount)
+                      ? `${zone.weeklyEventsCount} events this week`
+                      : ""
+                }
               />
             ))}
           </List.Dropdown.Section>
@@ -467,6 +506,53 @@ export default function Command(
         </List.Section>
       ) : (
         <>
+          <List.Section title="Filters">
+            <List.Item
+              title="Categories"
+              subtitle={
+                selectedCategory === CATEGORY_ALL
+                  ? "All categories"
+                  : `Selected: ${selectedCategory}`
+              }
+              icon={Icon.AppWindowGrid2x2}
+              accessories={categoryPillAccessories}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Show All Categories"
+                    onAction={() => setSelectedCategory(CATEGORY_ALL)}
+                  />
+                  {categoryOptions
+                    .filter((category) => category !== CATEGORY_ALL)
+                    .map((category) => (
+                    <Action
+                      key={category}
+                      title={`Show ${category}`}
+                      onAction={() => setSelectedCategory(category)}
+                    />
+                  ))}
+                </ActionPanel>
+              }
+            />
+            <List.Item
+              title="When"
+              subtitle={timeWindowLabel(selectedTimeWindow)}
+              icon={Icon.Clock}
+              accessories={[{ text: `${timeWindowEvents.length} events` }]}
+              actions={
+                <ActionPanel>
+                  {TIME_WINDOW_OPTIONS.map((option) => (
+                    <Action
+                      key={option.id}
+                      title={`Show ${option.title}`}
+                      onAction={() => applyTimeWindow(option.id)}
+                    />
+                  ))}
+                </ActionPanel>
+              }
+            />
+          </List.Section>
+
           {daySections.length ? (
             daySections.map((section) => (
               <List.Section key={section.id} title={section.title}>
@@ -585,82 +671,6 @@ export default function Command(
               />
             </List.Section>
           )}
-
-          <List.Section title="Browse">
-            <List.Item
-              title="When"
-              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter to switch.`}
-              icon={Icon.Clock}
-              accessories={[{ text: `${timeWindowEvents.length} events` }]}
-              actions={
-                <ActionPanel>
-                  {TIME_WINDOW_OPTIONS.map((option) => (
-                    <Action
-                      key={option.id}
-                      title={`Show ${option.title}`}
-                      onAction={() => applyTimeWindow(option.id)}
-                    />
-                  ))}
-                </ActionPanel>
-              }
-            />
-            <List.Item
-              title="Category"
-              subtitle={
-                selectedCategory === CATEGORY_ALL
-                  ? "All categories. Press Enter to choose."
-                  : `${selectedCategory}. Press Enter to change.`
-              }
-              icon={Icon.Tag}
-              accessories={[
-                { text: selectedCategory },
-                { text: `${timeWindowEvents.length} results` },
-              ]}
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="Show All Categories"
-                    onAction={() => setSelectedCategory(CATEGORY_ALL)}
-                  />
-                  {categoryOptions
-                    .filter((category) => category !== CATEGORY_ALL)
-                    .map((category) => (
-                    <Action
-                      key={category}
-                      title={`Show ${category}`}
-                      onAction={() => setSelectedCategory(category)}
-                    />
-                  ))}
-                </ActionPanel>
-              }
-            />
-          </List.Section>
-
-          <List.Section title="Town">
-            <List.Item
-              title={`Home Zone: ${activeTownName}`}
-              subtitle={`${activeTownSlug || "not set"}${activeTimezone ? ` · ${activeTimezone}` : ""}`}
-              icon={{ source: "icon.png" }}
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="Reset Home Zone"
-                    onAction={() => {
-                      void resetHomeZone();
-                    }}
-                    icon={Icon.XMarkCircle}
-                  />
-                  {QUICK_QUERY_PRESETS.slice(0, 2).map((preset) => (
-                    <Action
-                      key={preset.id}
-                      title={`Run: ${preset.title}`}
-                      onAction={() => setSearchText(preset.query)}
-                    />
-                  ))}
-                </ActionPanel>
-              }
-            />
-          </List.Section>
         </>
       )}
 
