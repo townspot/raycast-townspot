@@ -317,27 +317,43 @@ export const EventDetailView = ({
       }
       actions={
         <ActionPanel>
+          <ActionPanel.Section title="Quick Actions">
+            <Action.OpenInBrowser
+              title="Open on TownSpot"
+              url={url}
+              shortcut={{ modifiers: ["cmd"], key: "o" }}
+            />
+            <Action.OpenInBrowser
+              title="Share on WhatsApp"
+              url={whatsappUrl}
+              shortcut={{ modifiers: ["cmd", "shift"], key: "w" }}
+            />
+            {details?.sourceUrl ? (
+              <Action.OpenInBrowser
+                title="Open Source URL"
+                url={details.sourceUrl}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "u" }}
+              />
+            ) : null}
+          </ActionPanel.Section>
           {hasCoordinates ? (
-            <>
+            <ActionPanel.Section title="Maps">
               <Action.OpenInBrowser title="Open in Apple Maps" url={appleUrl as string} />
               <Action.OpenInBrowser title="Open in Google Maps" url={googleUrl as string} />
-            </>
+            </ActionPanel.Section>
           ) : null}
-          <Action.OpenInBrowser title="Share on WhatsApp" url={whatsappUrl} />
-          <Action.CopyToClipboard title="Copy Share Message" content={shareMessage} />
-          <Action.OpenInBrowser title="Open on Website" url={url} />
-          <Action.CopyToClipboard title="Copy Event Link" content={url} />
-          <Action.CopyToClipboard title="Copy Event Name" content={event.title} />
-          <Action.CopyToClipboard
-            title="Copy Event Time"
-            content={legacyTimeLabel || event.startLabel || "TBC"}
-          />
-          {details?.locationAddress ? (
-            <Action.CopyToClipboard title="Copy Event Address" content={details.locationAddress} />
-          ) : null}
-          {details?.sourceUrl ? (
-            <Action.OpenInBrowser title="Open Source Link" url={details.sourceUrl} />
-          ) : null}
+          <ActionPanel.Section title="Copy">
+            <Action.CopyToClipboard title="Copy Share Message" content={shareMessage} />
+            <Action.CopyToClipboard title="Copy Event Link" content={url} />
+            <Action.CopyToClipboard title="Copy Event Name" content={event.title} />
+            <Action.CopyToClipboard
+              title="Copy Event Time"
+              content={legacyTimeLabel || event.startLabel || "TBC"}
+            />
+            {details?.locationAddress ? (
+              <Action.CopyToClipboard title="Copy Event Address" content={details.locationAddress} />
+            ) : null}
+          </ActionPanel.Section>
         </ActionPanel>
       }
     />
