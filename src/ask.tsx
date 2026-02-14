@@ -34,6 +34,7 @@ const HOME_ZONE_STORAGE_KEY = "townspot-home-zone-id";
 const NO_ZONE_VALUE = "__unset__";
 const ZONE_VALUE_PREFIX = "zone:";
 const SMALL_DOT = "·";
+const API_EVENT_FETCH_LIMIT = 120;
 
 const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   const [debounced, setDebounced] = useState(value);
@@ -341,7 +342,7 @@ export default function Command(
           townSlug: effectiveTownSlug,
           locale: preferences.locale,
           apiBaseUrl: preferences.apiBaseUrl,
-          limit: 20,
+          limit: API_EVENT_FETCH_LIMIT,
           conversation: [],
         });
         if (cancelled) return;
