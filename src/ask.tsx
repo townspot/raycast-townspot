@@ -109,7 +109,7 @@ type TimeWindowOption = {
 };
 
 const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
-  { id: "now", title: "Now" },
+  { id: "now", title: "NOW" },
   { id: "all_upcoming", title: "All Upcoming" },
   { id: "today", title: "Today" },
   {
@@ -694,7 +694,7 @@ export default function Command(
                   const accessories: List.Item.Accessory[] = [];
                   const statusLabel =
                     liveTag === "NOW"
-                      ? "· Now"
+                      ? "· NOW"
                       : liveTag
                         ? `· ${liveTag}`
                         : "";
