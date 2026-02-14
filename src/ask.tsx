@@ -583,9 +583,9 @@ export default function Command(
       isLoading={loading || zonesLoading || homeZoneLoading}
       searchBarPlaceholder={
         !selectionHydrated
-          ? "Loading your Hometown..."
+          ? "Loading your hometown..."
           : needsHomeZone
-          ? "Set your Hometown from the dropdown to start"
+          ? "Set your hometown from the dropdown to start"
           : personalizedPlaceholder
       }
       searchText={searchText}
@@ -625,15 +625,15 @@ export default function Command(
       {!selectionHydrated ? null : needsHomeZone ? (
         <List.Section title="Setup">
           <List.Item
-            title="Set your Hometown to continue"
-            subtitle="Open the Hometown dropdown above and choose your town."
+            title="Set your hometown to continue"
+            subtitle="Open the hometown dropdown above and choose your town."
             icon={Icon.Pin}
             actions={
               <ActionPanel>
                 {zones.map((zone) => (
                   <Action
                     key={zone.id}
-                    title={`Set Hometown: ${zone.name}`}
+                    title={`Set hometown: ${zone.name}`}
                     onAction={() => {
                       void setHomeZone(zone);
                     }}
