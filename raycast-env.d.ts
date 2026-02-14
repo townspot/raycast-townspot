@@ -24,11 +24,6 @@ declare namespace Preferences {
 
 declare namespace Arguments {
   /** Arguments passed to the `ask` command */
-  export type Ask = {
-  /** What are people doing tonight? */
-  "query": string,
-  /** kentish-town */
-  "townSlug": string
-}
+  export type Ask = {}
 }
 

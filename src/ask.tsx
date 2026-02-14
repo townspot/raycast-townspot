@@ -1,6 +1,7 @@
 import {
   Action,
   ActionPanel,
+  Color,
   Icon,
   List,
   LocalStorage,
@@ -11,6 +12,7 @@ import {
   filterEventsByTimeWindow,
   formatEventTime,
   groupEventsByDay,
+  relativeStartTag,
   TimeWindow,
 } from "./lib/event-listing";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
@@ -279,6 +281,7 @@ export default function Command(
   const activeTownSlug = effectiveTownSlug || "";
   const activeTimezone =
     response?.town?.slug === activeTownSlug ? response?.town?.timezone || "" : "";
+  const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
@@ -356,11 +359,12 @@ export default function Command(
 
   return (
     <List
+      navigationTitle={needsHomeZone ? "TownSpot" : `${activeTownName} · TownSpot`}
       isLoading={loading || zonesLoading || homeZoneLoading}
       searchBarPlaceholder={
         needsHomeZone
           ? "Set your Home Zone from the dropdown to start"
-          : "Ask naturally: tonight, weekend, kids events, free events..."
+          : personalizedPlaceholder
       }
       searchText={searchText}
       onSearchTextChange={setSearchText}
@@ -423,6 +427,18 @@ export default function Command(
                 {section.events.map((event) => {
                   const resolvedEventUrl = resolveEventUrl(event.url);
                   const timeLabel = formatEventTime(event.startTime, sectionTimezone);
+                  const liveTag = relativeStartTag(event);
+                  const accessories: List.Item.Accessory[] = [];
+                  if (liveTag === "NOW") {
+                    accessories.push({
+                      tag: { value: liveTag, color: Color.Green },
+                    });
+                  } else if (liveTag) {
+                    accessories.push({ tag: liveTag });
+                  }
+                  if (timeLabel) {
+                    accessories.push({ text: timeLabel });
+                  }
                   const categoriesLabel = toCategoriesLabel(event.tags);
                   const subtitleBase = event.venueName || activeTownName;
                   const subtitle = categoriesLabel
@@ -435,7 +451,7 @@ export default function Command(
                       title={event.title}
                       subtitle={subtitle}
                       icon={{ source: "icon.png" }}
-                      accessories={timeLabel ? [{ text: timeLabel }] : []}
+                      accessories={accessories}
                       actions={
                         <ActionPanel>
                           <ActionPanel.Section title="Event">

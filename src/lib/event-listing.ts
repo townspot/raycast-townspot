@@ -36,18 +36,11 @@ const sortEvents = (events: RaycastEvent[]): RaycastEvent[] =>
     return aTime - bTime;
   });
 
-const keepUpcomingEvents = (events: RaycastEvent[]): RaycastEvent[] => {
-  const nowMs = Date.now();
-  return events.filter((event) => {
-    const startMs = Date.parse(event.startTime || "");
-    if (Number.isNaN(startMs)) return false;
-    return startMs >= nowMs;
-  });
-};
-
-const isEventLiveNow = (event: RaycastEvent, nowMs: number): boolean => {
+const getEventWindowMs = (
+  event: RaycastEvent,
+): { startMs: number; endMs: number } | null => {
   const startMs = Date.parse(event.startTime || "");
-  if (Number.isNaN(startMs)) return false;
+  if (Number.isNaN(startMs)) return null;
 
   const parsedEndMs = Date.parse(event.endTime || "");
   const endMs =
@@ -55,7 +48,37 @@ const isEventLiveNow = (event: RaycastEvent, nowMs: number): boolean => {
       ? startMs + DEFAULT_EVENT_DURATION_MS
       : parsedEndMs;
 
-  return nowMs >= startMs && nowMs < endMs;
+  return { startMs, endMs };
+};
+
+const keepUpcomingEvents = (events: RaycastEvent[]): RaycastEvent[] => {
+  const nowMs = Date.now();
+  return events.filter((event) => {
+    const window = getEventWindowMs(event);
+    if (!window) return false;
+    return window.endMs > nowMs;
+  });
+};
+
+export const isEventLiveNow = (event: RaycastEvent, nowMs = Date.now()): boolean => {
+  const window = getEventWindowMs(event);
+  if (!window) return false;
+  return nowMs >= window.startMs && nowMs < window.endMs;
+};
+
+export const relativeStartTag = (
+  event: RaycastEvent,
+  nowMs = Date.now(),
+): string | null => {
+  if (isEventLiveNow(event, nowMs)) return "NOW";
+
+  const window = getEventWindowMs(event);
+  if (!window) return null;
+  if (window.startMs <= nowMs) return null;
+
+  const minutesUntilStart = Math.ceil((window.startMs - nowMs) / (60 * 1000));
+  if (minutesUntilStart <= 0 || minutesUntilStart > 180) return null;
+  return `in ${minutesUntilStart}m`;
 };
 
 const dateKeyForOffset = (base: Date, timezone: string, offsetDays: number): string => {
