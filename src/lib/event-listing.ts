@@ -78,7 +78,7 @@ export const relativeStartTag = (
 
   const minutesUntilStart = Math.ceil((window.startMs - nowMs) / (60 * 1000));
   if (minutesUntilStart <= 0 || minutesUntilStart > 180) return null;
-  return `in ${minutesUntilStart}m`;
+  return `in ${Math.min(minutesUntilStart, 60)}m`;
 };
 
 const dateKeyForOffset = (base: Date, timezone: string, offsetDays: number): string => {
