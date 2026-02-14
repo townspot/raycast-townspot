@@ -428,7 +428,7 @@ export default function Command(
     response?.town?.slug === effectiveTownSlug ? response : null;
   const cachedResponseForActiveTown = effectiveTownSlug ? cachedResponsesByTown[effectiveTownSlug] : null;
   const displayResponseForActiveTown = responseForActiveTown || cachedResponseForActiveTown || null;
-  const activeTownName = selectedZone?.name || "Home Zone";
+  const activeTownName = selectedZone?.name || "Hometown";
   const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
     ? `${activeThisWeek} locals active`
@@ -438,11 +438,11 @@ export default function Command(
 
   useEffect(() => {
     if (!selectionHydrated) {
-      void updateCommandMetadata({ subtitle: "Loading home zone..." });
+      void updateCommandMetadata({ subtitle: "Loading hometown..." });
       return;
     }
     if (needsHomeZone || !selectedZone) {
-      void updateCommandMetadata({ subtitle: "Set Home Zone" });
+      void updateCommandMetadata({ subtitle: "Set Hometown" });
       return;
     }
     void updateCommandMetadata({
@@ -590,16 +590,16 @@ export default function Command(
       isLoading={loading || zonesLoading || homeZoneLoading}
       searchBarPlaceholder={
         !selectionHydrated
-          ? "Loading your Home Zone..."
+          ? "Loading your Hometown..."
           : needsHomeZone
-          ? "Set your Home Zone from the dropdown to start"
+          ? "Set your Hometown from the dropdown to start"
           : personalizedPlaceholder
       }
       searchText={searchText}
       onSearchTextChange={setSearchText}
       searchBarAccessory={
         <List.Dropdown
-          tooltip="Home Zone"
+          tooltip="Hometown"
           value={selectedTownValue}
           onChange={(value) => {
             void onHomeZoneChange(value);
@@ -609,9 +609,9 @@ export default function Command(
             value={NO_ZONE_VALUE}
             title={
               !selectionHydrated
-                ? "Loading Home Zone..."
+                ? "Loading Hometown..."
                 : needsHomeZone
-                  ? "Set Home Zone..."
+                  ? "Set Hometown..."
                   : selectedZoneTitle || `${activeTownName} ${SMALL_DOT} ${activeThisWeekLabel}`
             }
             icon={Icon.Pin}
@@ -632,15 +632,15 @@ export default function Command(
       {!selectionHydrated ? null : needsHomeZone ? (
         <List.Section title="Setup">
           <List.Item
-            title="Set your Home Zone to continue"
-            subtitle="Open the Home Zone dropdown above and choose your Town."
+            title="Set your Hometown to continue"
+            subtitle="Open the Hometown dropdown above and choose your Town."
             icon={Icon.Pin}
             actions={
               <ActionPanel>
                 {zones.map((zone) => (
                   <Action
                     key={zone.id}
-                    title={`Set Home Zone: ${zone.name}`}
+                    title={`Set Hometown: ${zone.name}`}
                     onAction={() => {
                       void setHomeZone(zone);
                     }}
@@ -887,7 +887,7 @@ export default function Command(
       ) : null}
 
       {zonesError ? (
-        <List.Section title="Home Zone">
+        <List.Section title="Hometown">
           <List.Item
             title="Active towns unavailable"
             subtitle={zonesError}
