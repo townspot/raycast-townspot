@@ -5,6 +5,7 @@ import {
   EventDetails,
   fetchEventDetails,
   googleMapsUrl,
+  staticMapPreviewUrl,
 } from "../lib/event-details";
 import { formatEventTime } from "../lib/event-listing";
 import { splitEventTags } from "../lib/event-tags";
@@ -32,43 +33,97 @@ const formatDateTime = (value: string | undefined | null, timezone: string): str
   }).format(parsed);
 };
 
+const formatTimeRange = (
+  startValue: string | undefined | null,
+  endValue: string | undefined | null,
+  timezone: string,
+): string => {
+  const start = formatDateTime(startValue, timezone);
+  if (!endValue) return start;
+  const end = formatDateTime(endValue, timezone);
+  if (start === "TBC") return end;
+  return `${start} -> ${end}`;
+};
+
 const escapeMarkdown = (value: string): string =>
   value
     .replace(/\\/g, "\\\\")
     .replace(/([*_`[\\]()#+\-.!])/g, "\\$1");
 
+const fallbackVenue = (details: EventDetails | null, event: RaycastEvent): string => {
+  return details?.locationName || details?.venueDescription || event.venueName || "TBC";
+};
+
+const fallbackAddress = (details: EventDetails | null): string => {
+  return details?.locationAddress || details?.venueDescription || "";
+};
+
+const recurringLabel = (event: RaycastEvent): string | null => {
+  const frequency = splitEventTags(event.tags).frequency;
+  if (!frequency) return null;
+  if (frequency.toLowerCase() === "one-off") return null;
+  return `${frequency} recurring event`;
+};
+
+const priceLabel = (details: EventDetails | null): string | null => {
+  const explicit = String(details?.priceInfo || "").trim();
+  if (explicit) return explicit;
+  if (details?.isFree === true) return "Free";
+  if (details?.isFree === false) return "Paid";
+  return null;
+};
+
+const categoryList = (details: EventDetails | null, event: RaycastEvent): string[] => {
+  const fallbackCategories = splitEventTags(event.tags).categories;
+  const values = details?.categories?.length ? details.categories : fallbackCategories;
+  return (values || []).filter(Boolean);
+};
+
+const categoriesLabel = (details: EventDetails | null, event: RaycastEvent): string => {
+  const categories = categoryList(details, event);
+  return categories.length ? categories.join(", ") : "None listed";
+};
+
 const buildMarkdown = (
   title: string,
   description: string | null,
   imageUrl: string | null,
+  metaRows: string[],
+  mapImageUrl: string | null,
+  mapLinksMarkdown: string | null,
 ): string => {
   const blocks = [`# ${escapeMarkdown(title)}`];
+
   if (imageUrl) {
     blocks.push("", `![Event image](${imageUrl})`);
   }
+
+  if (metaRows.length) {
+    blocks.push("", ...metaRows.map((row) => escapeMarkdown(row)));
+  }
+
+  if (mapImageUrl) {
+    blocks.push("", `![Map preview](${mapImageUrl})`);
+  }
+
+  if (mapLinksMarkdown) {
+    blocks.push("", mapLinksMarkdown);
+  }
+
   if (description) {
     blocks.push("", description);
   }
+
   return blocks.join("\n");
 };
 
-const categoriesLabel = (details: EventDetails | null, event: RaycastEvent): string => {
-  const fallbackCategories = splitEventTags(event.tags).categories;
-  const categories = details?.categories?.length ? details.categories : fallbackCategories;
-  return categories && categories.length ? categories.join(", ") : "None listed";
-};
-
-const fallbackVenue = (details: EventDetails | null, event: RaycastEvent): string => {
-  return (
-    details?.locationName ||
-    details?.venueDescription ||
-    event.venueName ||
-    "TBC"
-  );
-};
-
-const fallbackAddress = (details: EventDetails | null): string => {
-  return details?.locationAddress || details?.venueDescription || "Not provided";
+const buildShareMessage = (
+  title: string,
+  timeRangeLabel: string,
+  venueLabel: string,
+  url: string,
+): string => {
+  return `${title}\n${timeRangeLabel}\n📍 ${venueLabel}\n${url}`;
 };
 
 const EventMetadata = ({
@@ -85,51 +140,53 @@ const EventMetadata = ({
   const effectiveTimezone = details?.resolvedTimezone || details?.timezone || timezone;
   const startValue = details?.startTimeLocal || details?.startTime || event.startTime;
   const endValue = details?.endTimeLocal || details?.endTime || event.endTime;
-  const isFreeText =
-    details?.isFree === true ? "Yes" : details?.isFree === false ? "No" : "Unknown";
+  const timeRangeLabel = formatTimeRange(startValue, endValue, effectiveTimezone);
+  const venueLabel = fallbackVenue(details, event);
+  const addressLabel = fallbackAddress(details);
+  const recurring = recurringLabel(event);
+  const price = priceLabel(details);
+  const categories = categoryList(details, event);
 
   return (
     <Detail.Metadata>
-      <Detail.Metadata.Label title="Time" text={formatDateTime(startValue, effectiveTimezone)} />
+      <Detail.Metadata.Label title="When" text={timeRangeLabel} />
       <Detail.Metadata.Separator />
-      <Detail.Metadata.Label
-        title="Ends"
-        text={endValue ? formatDateTime(endValue, effectiveTimezone) : "Not specified"}
-      />
+      <Detail.Metadata.Label title="Where" text={venueLabel} />
       <Detail.Metadata.Separator />
-      <Detail.Metadata.Label title="Venue" text={fallbackVenue(details, event)} />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label title="Address" text={fallbackAddress(details)} />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.TagList title="Categories">
-        {categoriesLabel(details, event)
-          .split(", ")
-          .filter(Boolean)
-          .map((category) => (
-          <Detail.Metadata.TagList.Item key={category} text={category} />
-        ))}
-      </Detail.Metadata.TagList>
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label
-        title="Price"
-        text={details?.priceInfo || (details?.isFree === true ? "Free" : "Not specified")}
-      />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label
-        title="Booking Required"
-        text={
-          details?.bookingRequired === true
-            ? "Yes"
-            : details?.bookingRequired === false
-              ? "No"
-              : "Unknown"
-        }
-      />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label title="Free Event" text={isFreeText} />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label title="Town" text={details?.zoneName || "Unknown"} />
-      <Detail.Metadata.Separator />
+      {addressLabel ? (
+        <>
+          <Detail.Metadata.Label title="Address" text={addressLabel} />
+          <Detail.Metadata.Separator />
+        </>
+      ) : null}
+      {recurring ? (
+        <>
+          <Detail.Metadata.Label title="Recurrence" text={recurring} />
+          <Detail.Metadata.Separator />
+        </>
+      ) : null}
+      {price ? (
+        <>
+          <Detail.Metadata.Label title="Price" text={price} />
+          <Detail.Metadata.Separator />
+        </>
+      ) : null}
+      {categories.length ? (
+        <>
+          <Detail.Metadata.TagList title="Categories">
+            {categories.map((category) => (
+              <Detail.Metadata.TagList.Item key={category} text={category} />
+            ))}
+          </Detail.Metadata.TagList>
+          <Detail.Metadata.Separator />
+        </>
+      ) : null}
+      {details?.zoneName ? (
+        <>
+          <Detail.Metadata.Label title="Town" text={details.zoneName} />
+          <Detail.Metadata.Separator />
+        </>
+      ) : null}
       <Detail.Metadata.Link title="TownSpot Link" target={url} text="Open listing" />
     </Detail.Metadata>
   );
@@ -174,11 +231,14 @@ export const EventDetailView = ({
   }, [apiBaseUrl, event.id]);
 
   const effectiveTimezone = details?.resolvedTimezone || details?.timezone || timezone;
-  const detailMarkdown = useMemo(() => {
-    const description = details?.description || null;
-    const imageUrl = details?.imageUrl || details?.mainImgUrl || null;
-    return buildMarkdown(details?.title || event.title, description, imageUrl);
-  }, [details, event.title]);
+  const startValue = details?.startTimeLocal || details?.startTime || event.startTime;
+  const endValue = details?.endTimeLocal || details?.endTime || event.endTime;
+  const venueLabel = fallbackVenue(details, event);
+  const addressLabel = fallbackAddress(details);
+  const recurring = recurringLabel(event);
+  const price = priceLabel(details);
+  const categoryLabel = categoriesLabel(details, event);
+  const timeRangeLabel = formatTimeRange(startValue, endValue, effectiveTimezone);
 
   const mapsLabel = details?.locationName || details?.locationAddress || event.venueName;
   const hasCoordinates =
@@ -187,7 +247,62 @@ export const EventDetailView = ({
     typeof details?.lng === "number" &&
     Number.isFinite(details.lng);
 
+  const googleUrl = hasCoordinates
+    ? googleMapsUrl(details.lat as number, details.lng as number, mapsLabel)
+    : null;
+  const appleUrl = hasCoordinates
+    ? appleMapsUrl(details.lat as number, details.lng as number, mapsLabel)
+    : null;
+  const mapImageUrl = hasCoordinates
+    ? staticMapPreviewUrl(details.lat as number, details.lng as number)
+    : null;
+
+  const mapLinksMarkdown =
+    googleUrl && appleUrl
+      ? `[Open in Apple Maps](${appleUrl}) | [Open in Google Maps](${googleUrl})`
+      : null;
+
+  const detailMarkdown = useMemo(() => {
+    const description = details?.description || null;
+    const imageUrl = details?.imageUrl || details?.mainImgUrl || null;
+    const metaRows = [
+      `🕒 ${timeRangeLabel}`,
+      `📍 ${venueLabel}`,
+      addressLabel ? `🧭 ${addressLabel}` : "",
+      recurring ? `🔁 ${recurring}` : "",
+      categoryLabel && categoryLabel !== "None listed" ? `🏷️ ${categoryLabel}` : "",
+      price ? `💸 ${price}` : "",
+    ].filter(Boolean);
+
+    return buildMarkdown(
+      details?.title || event.title,
+      description,
+      imageUrl,
+      metaRows,
+      mapImageUrl,
+      mapLinksMarkdown,
+    );
+  }, [
+    details,
+    event.title,
+    timeRangeLabel,
+    venueLabel,
+    addressLabel,
+    recurring,
+    categoryLabel,
+    price,
+    mapImageUrl,
+    mapLinksMarkdown,
+  ]);
+
   const legacyTimeLabel = formatEventTime(event.startTime, effectiveTimezone);
+  const shareMessage = buildShareMessage(
+    details?.title || event.title,
+    timeRangeLabel,
+    venueLabel,
+    url,
+  );
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
   return (
     <Detail
@@ -204,16 +319,12 @@ export const EventDetailView = ({
         <ActionPanel>
           {hasCoordinates ? (
             <>
-              <Action.OpenInBrowser
-                title="Open in Apple Maps"
-                url={appleMapsUrl(details.lat as number, details.lng as number, mapsLabel)}
-              />
-              <Action.OpenInBrowser
-                title="Open in Google Maps"
-                url={googleMapsUrl(details.lat as number, details.lng as number, mapsLabel)}
-              />
+              <Action.OpenInBrowser title="Open in Apple Maps" url={appleUrl as string} />
+              <Action.OpenInBrowser title="Open in Google Maps" url={googleUrl as string} />
             </>
           ) : null}
+          <Action.OpenInBrowser title="Share on WhatsApp" url={whatsappUrl} />
+          <Action.CopyToClipboard title="Copy Share Message" content={shareMessage} />
           <Action.OpenInBrowser title="Open on Website" url={url} />
           <Action.CopyToClipboard title="Copy Event Link" content={url} />
           <Action.CopyToClipboard title="Copy Event Name" content={event.title} />
@@ -222,10 +333,10 @@ export const EventDetailView = ({
             content={legacyTimeLabel || event.startLabel || "TBC"}
           />
           {details?.locationAddress ? (
-            <Action.CopyToClipboard
-              title="Copy Event Address"
-              content={details.locationAddress}
-            />
+            <Action.CopyToClipboard title="Copy Event Address" content={details.locationAddress} />
+          ) : null}
+          {details?.sourceUrl ? (
+            <Action.OpenInBrowser title="Open Source Link" url={details.sourceUrl} />
           ) : null}
         </ActionPanel>
       }
