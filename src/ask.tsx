@@ -447,7 +447,7 @@ export default function Command(
     }
     const activityCount = Number.isFinite(activeThisWeek) ? String(activeThisWeek) : "0";
     void updateCommandMetadata({
-      subtitle: `${activityCount} local active this week`,
+      subtitle: `${selectedZone.name} ${SMALL_DOT} ${activityCount} local active this week`,
     });
   }, [selectionHydrated, needsHomeZone, selectedZone, activeThisWeek]);
 
