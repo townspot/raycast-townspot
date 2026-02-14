@@ -98,15 +98,27 @@ const escapeMarkdown = (value: string): string =>
     .replace(/\\/g, "\\\\")
     .replace(/([*_`[\\]()#+\-.!])/g, "\\$1");
 
+const sanitizeDescription = (value: string | null): string | null => {
+  if (!value) return null;
+  const lines = value.split(/\r?\n/);
+  const cleaned = lines.filter((line) => {
+    const text = line.trim();
+    if (!text) return true;
+    if (/^open in (apple|google) maps/i.test(text)) return false;
+    if (text.includes("|") && /open in (apple|google) maps/i.test(text)) return false;
+    if (text.includes("🕒") || text.includes("📍") || text.includes("🧭") || text.includes("🏷")) return false;
+    return true;
+  });
+
+  const normalized = cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return normalized || null;
+};
+
 const buildMarkdown = (
   title: string,
   description: string | null,
-  imageUrl: string | null,
 ): string => {
   const blocks = [`# ${escapeMarkdown(title)}`];
-  if (imageUrl) {
-    blocks.push("", `![Event image](${imageUrl})`);
-  }
   if (description) {
     blocks.push("", description);
   }
@@ -276,9 +288,8 @@ export const EventDetailView = ({
     : null;
 
   const detailMarkdown = useMemo(() => {
-    const description = details?.description || null;
-    const imageUrl = details?.imageUrl || details?.mainImgUrl || null;
-    return buildMarkdown(details?.title || event.title, description, imageUrl);
+    const description = sanitizeDescription(details?.description || null);
+    return buildMarkdown(details?.title || event.title, description);
   }, [details, event.title]);
 
   const legacyTimeLabel = formatEventTime(event.startTime, effectiveTimezone);
