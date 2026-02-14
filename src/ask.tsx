@@ -109,6 +109,36 @@ const eventMatchesCategory = (tags: string[], selectedCategory: string): boolean
   return normalizedTags.includes(normalizedSelected);
 };
 
+const normalizeWindowQuery = (value: string): string =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const inferTimeWindowFromQuery = (value: string): TimeWindow | null => {
+  const query = normalizeWindowQuery(value);
+  if (!query) return null;
+  if (
+    query.includes("right now") ||
+    query.includes("happening now") ||
+    query.includes("on now") ||
+    query.includes("live now") ||
+    query === "now" ||
+    query.startsWith("now ")
+  ) {
+    return "now";
+  }
+  if (query.includes("tomorrow")) return "today_tomorrow";
+  if (query.includes("this weekend")) return "next_3_days";
+  if (query.includes("this week")) return "this_week";
+  if (query.includes("next 7 days") || query.includes("next week")) return "next_7_days";
+  if (query.includes("next 3 days")) return "next_3_days";
+  if (query.includes("today")) return "today";
+  if (query.includes("tonight")) return "today";
+  return null;
+};
+
 export default function Command(
 ): JSX.Element {
   const preferences = getPreferenceValues<Preferences>();
@@ -132,6 +162,12 @@ export default function Command(
     const trimmed = debouncedSearchText.trim();
     return trimmed || FALLBACK_API_QUERY;
   }, [debouncedSearchText]);
+
+  useEffect(() => {
+    const inferred = inferTimeWindowFromQuery(debouncedSearchText);
+    if (!inferred || inferred === selectedTimeWindow) return;
+    setSelectedTimeWindow(inferred);
+  }, [debouncedSearchText, selectedTimeWindow]);
 
   useEffect(() => {
     let cancelled = false;
@@ -600,15 +636,11 @@ export default function Command(
             />
           </List.Section>
 
-          <List.Section title="Home Zone">
+          <List.Section title="Town">
             <List.Item
               title={`Home Zone: ${activeTownName}`}
-              subtitle={activeTownSlug || "not set"}
+              subtitle={`${activeTownSlug || "not set"}${activeTimezone ? ` · ${activeTimezone}` : ""}`}
               icon={{ source: "icon.png" }}
-              accessories={[
-                { text: `${zones.length} active` },
-                ...(activeTimezone ? [{ text: activeTimezone }] : []),
-              ]}
               actions={
                 <ActionPanel>
                   <Action
@@ -618,66 +650,17 @@ export default function Command(
                     }}
                     icon={Icon.XMarkCircle}
                   />
-                  <Action
-                    title="Use Kids and Family Query"
-                    onAction={() => setSearchText("kids and family events this weekend")}
-                    icon={Icon.Person}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Town Slug"
-                    content={activeTownSlug}
-                  />
+                  {QUICK_QUERY_PRESETS.slice(0, 2).map((preset) => (
+                    <Action
+                      key={preset.id}
+                      title={`Run: ${preset.title}`}
+                      onAction={() => setSearchText(preset.query)}
+                    />
+                  ))}
                 </ActionPanel>
               }
             />
           </List.Section>
-
-          <List.Section title="Quick Searches">
-            {QUICK_QUERY_PRESETS.map((preset) => (
-              <List.Item
-                key={preset.id}
-                title={preset.title}
-                subtitle={preset.subtitle}
-                icon={Icon.MagnifyingGlass}
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title="Run Search"
-                      onAction={() => setSearchText(preset.query)}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Query"
-                      content={preset.query}
-                    />
-                  </ActionPanel>
-                }
-              />
-            ))}
-          </List.Section>
-
-          {response?.suggestions?.length ? (
-            <List.Section title="Follow-up Prompts">
-              {response.suggestions.map((suggestion, index) => (
-                <List.Item
-                  key={`${index}-${suggestion}`}
-                  title={suggestion}
-                  icon={Icon.Repeat}
-                  actions={
-                    <ActionPanel>
-                      <Action
-                        title="Run Follow-up Search"
-                        onAction={() => setSearchText(suggestion)}
-                      />
-                      <Action.CopyToClipboard
-                        title="Copy Follow-up"
-                        content={suggestion}
-                      />
-                    </ActionPanel>
-                  }
-                />
-              ))}
-            </List.Section>
-          ) : null}
         </>
       )}
 
