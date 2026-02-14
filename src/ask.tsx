@@ -179,13 +179,15 @@ export default function Command(
   const [searchText, setSearchText] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<RaycastResponse | null>(null);
+  const [cachedResponsesByTown, setCachedResponsesByTown] = useState<Record<string, RaycastResponse>>({});
+  const [hasLoadedTownData, setHasLoadedTownData] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<TimeWindow>(DEFAULT_TIME_WINDOW);
   const [manualCategoryQuery, setManualCategoryQuery] = useState("");
   const [manualTimeWindowQuery, setManualTimeWindowQuery] = useState("");
 
-  const debouncedSearchText = useDebouncedValue(searchText, 350);
+  const debouncedSearchText = useDebouncedValue(searchText, 200);
   const normalizedQuery = useMemo(
     () => normalizeWindowQuery(debouncedSearchText),
     [debouncedSearchText],
@@ -332,6 +334,16 @@ export default function Command(
         });
         if (cancelled) return;
         setResponse(result);
+        if (result?.town?.slug) {
+          setCachedResponsesByTown((previous) => ({
+            ...previous,
+            [result.town.slug]: result,
+          }));
+          setHasLoadedTownData((previous) => ({
+            ...previous,
+            [result.town.slug]: true,
+          }));
+        }
       } catch (error) {
         if (cancelled) return;
         setErrorMessage(
@@ -359,6 +371,8 @@ export default function Command(
 
   const responseForActiveTown =
     response?.town?.slug === effectiveTownSlug ? response : null;
+  const cachedResponseForActiveTown = effectiveTownSlug ? cachedResponsesByTown[effectiveTownSlug] : null;
+  const displayResponseForActiveTown = responseForActiveTown || cachedResponseForActiveTown || null;
   const activeTownName = selectedZone?.name || "Home Zone";
   const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
@@ -369,7 +383,7 @@ export default function Command(
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
-    for (const event of responseForActiveTown?.events || []) {
+    for (const event of displayResponseForActiveTown?.events || []) {
       const tagParts = splitEventTags(event.tags || []);
       for (const tag of tagParts.categories) {
         const value = String(tag).trim();
@@ -385,14 +399,14 @@ export default function Command(
       sorted.unshift("Kids");
     }
     return [CATEGORY_ALL, ...sorted];
-  }, [responseForActiveTown]);
+  }, [displayResponseForActiveTown]);
 
   const categoryFilteredEvents = useMemo(
     () =>
-      (responseForActiveTown?.events || []).filter((event) =>
+      (displayResponseForActiveTown?.events || []).filter((event) =>
         eventMatchesCategory(splitEventTags(event.tags || []).categories, selectedCategory),
       ),
-    [responseForActiveTown, selectedCategory],
+    [displayResponseForActiveTown, selectedCategory],
   );
 
   useEffect(() => {
@@ -400,7 +414,7 @@ export default function Command(
     setSelectedCategory(CATEGORY_ALL);
   }, [categoryOptions, selectedCategory]);
 
-  const sectionTimezone = responseForActiveTown?.town?.timezone || "Europe/London";
+  const sectionTimezone = displayResponseForActiveTown?.town?.timezone || "Europe/London";
   const timeWindowEvents = useMemo(
     () =>
       filterEventsByTimeWindow(
@@ -415,6 +429,14 @@ export default function Command(
     () => groupEventsByDay(timeWindowEvents, sectionTimezone),
     [timeWindowEvents, sectionTimezone],
   );
+  const hasSeenTownData = Boolean(effectiveTownSlug && hasLoadedTownData[effectiveTownSlug]);
+  const shouldShowLoadingResults = loading && !displayResponseForActiveTown;
+  const shouldShowNoEvents =
+    !loading &&
+    !errorMessage &&
+    !shouldShowLoadingResults &&
+    (hasSeenTownData || Boolean(displayResponseForActiveTown)) &&
+    daySections.length === 0;
   const categoryPillAccessories = useMemo(
     () =>
       categoryOptions
@@ -729,7 +751,15 @@ export default function Command(
                 })}
               </List.Section>
             ))
-          ) : (
+          ) : shouldShowLoadingResults ? (
+            <List.Section title="Today">
+              <List.Item
+                title="Loading events…"
+                subtitle="Pulling the latest listings for your Town."
+                icon={Icon.Clock}
+              />
+            </List.Section>
+          ) : shouldShowNoEvents ? (
             <List.Section title="Today">
               <List.Item
                 title="No events for this search"
@@ -753,7 +783,7 @@ export default function Command(
                 }
               />
             </List.Section>
-          )}
+          ) : null}
         </>
       )}
 
