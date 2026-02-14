@@ -198,10 +198,6 @@ export default function Command(
     const inferred = inferCategoryFromQuery(debouncedSearchText);
     if (inferred && inferred !== selectedCategory) {
       setSelectedCategory(inferred);
-      return;
-    }
-    if (!inferred && debouncedSearchText.trim().length > 0 && selectedCategory !== CATEGORY_ALL) {
-      setSelectedCategory(CATEGORY_ALL);
     }
   }, [debouncedSearchText, selectedCategory]);
 
@@ -447,6 +443,23 @@ export default function Command(
     setSelectedTimeWindow(timeWindow);
   };
 
+  const cycleCategory = (direction: 1 | -1): void => {
+    const ordered = categoryOptions;
+    if (!ordered.length) return;
+    const currentIndex = Math.max(0, ordered.indexOf(selectedCategory));
+    const nextIndex =
+      (currentIndex + direction + ordered.length) % ordered.length;
+    setSelectedCategory(ordered[nextIndex]);
+  };
+
+  const nextCategory = (): void => {
+    cycleCategory(1);
+  };
+
+  const previousCategory = (): void => {
+    cycleCategory(-1);
+  };
+
   return (
     <List
       navigationTitle={needsHomeZone ? "TownSpot" : `${activeTownName} · ${activeThisWeekLabel}`}
@@ -530,6 +543,16 @@ export default function Command(
                   <Action
                     title="Show All Categories"
                     onAction={() => setSelectedCategory(CATEGORY_ALL)}
+                  />
+                  <Action
+                    title="Next Category"
+                    shortcut={{ modifiers: ["cmd"], key: "." }}
+                    onAction={nextCategory}
+                  />
+                  <Action
+                    title="Previous Category"
+                    shortcut={{ modifiers: ["cmd"], key: "," }}
+                    onAction={previousCategory}
                   />
                   {categoryOptions
                     .filter((category) => category !== CATEGORY_ALL)
@@ -622,6 +645,16 @@ export default function Command(
                             <Action
                               title="Show Events Happening Now"
                               onAction={() => applyTimeWindow("now")}
+                            />
+                            <Action
+                              title="Next Category"
+                              shortcut={{ modifiers: ["cmd"], key: "." }}
+                              onAction={nextCategory}
+                            />
+                            <Action
+                              title="Previous Category"
+                              shortcut={{ modifiers: ["cmd"], key: "," }}
+                              onAction={previousCategory}
                             />
                             <Action
                               title="Show Today + Tomorrow"
