@@ -143,6 +143,7 @@ export default function Command(
         const parsed = Number(stored || "");
         if (Number.isFinite(parsed)) {
           setHomeZoneId(parsed);
+          setSelectedTownValue(toZoneValue(parsed));
         } else {
           setHomeZoneId(null);
         }
@@ -217,20 +218,23 @@ export default function Command(
 
   const selectedZone = useMemo(
     () => {
-      const selectedZoneId = parseZoneId(selectedTownValue);
+      const selectedZoneId = parseZoneId(selectedTownValue) ?? homeZoneId;
       if (selectedZoneId === null) return undefined;
       return zones.find((zone) => zone.id === selectedZoneId);
     },
-    [selectedTownValue, zones],
+    [selectedTownValue, homeZoneId, zones],
   );
 
-  const needsHomeZone = !selectedZone;
+  const selectionHydrated = !homeZoneLoading && !zonesLoading;
+  const needsHomeZone = selectionHydrated && !selectedZone;
   const effectiveTownSlug = selectedZone?.slug || "";
 
   useEffect(() => {
     if (!effectiveTownSlug) {
-      setResponse(null);
-      setErrorMessage("");
+      if (selectionHydrated) {
+        setResponse(null);
+        setErrorMessage("");
+      }
       setLoading(false);
       return;
     }
@@ -239,7 +243,6 @@ export default function Command(
     const runQuery = async () => {
       setLoading(true);
       setErrorMessage("");
-      setResponse(null);
 
       try {
         const result = await askTownspot({
@@ -254,7 +257,6 @@ export default function Command(
         setResponse(result);
       } catch (error) {
         if (cancelled) return;
-        setResponse(null);
         setErrorMessage(
           error instanceof Error ? error.message : "Unable to reach TownSpot",
         );
@@ -275,17 +277,19 @@ export default function Command(
     preferences.apiBaseUrl,
     preferences.locale,
     effectiveTownSlug,
+    selectionHydrated,
   ]);
 
+  const responseForActiveTown =
+    response?.town?.slug === effectiveTownSlug ? response : null;
   const activeTownName = selectedZone?.name || "Home Zone";
   const activeTownSlug = effectiveTownSlug || "";
-  const activeTimezone =
-    response?.town?.slug === activeTownSlug ? response?.town?.timezone || "" : "";
+  const activeTimezone = responseForActiveTown?.town?.timezone || "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
-    for (const event of response?.events || []) {
+    for (const event of responseForActiveTown?.events || []) {
       for (const tag of event.tags || []) {
         const value = String(tag || "").trim();
         if (!value) continue;
@@ -300,14 +304,14 @@ export default function Command(
       sorted.unshift("Kids");
     }
     return [CATEGORY_ALL, ...sorted];
-  }, [response]);
+  }, [responseForActiveTown]);
 
   const categoryFilteredEvents = useMemo(
     () =>
-      (response?.events || []).filter((event) =>
+      (responseForActiveTown?.events || []).filter((event) =>
         eventMatchesCategory(event.tags || [], selectedCategory),
       ),
-    [response, selectedCategory],
+    [responseForActiveTown, selectedCategory],
   );
 
   useEffect(() => {
@@ -315,7 +319,7 @@ export default function Command(
     setSelectedCategory(CATEGORY_ALL);
   }, [categoryOptions, selectedCategory]);
 
-  const sectionTimezone = response?.town?.timezone || "Europe/London";
+  const sectionTimezone = responseForActiveTown?.town?.timezone || "Europe/London";
   const timeWindowEvents = useMemo(
     () =>
       filterEventsByTimeWindow(
@@ -362,7 +366,9 @@ export default function Command(
       navigationTitle={needsHomeZone ? "TownSpot" : `${activeTownName} · TownSpot`}
       isLoading={loading || zonesLoading || homeZoneLoading}
       searchBarPlaceholder={
-        needsHomeZone
+        !selectionHydrated
+          ? "Loading your Home Zone..."
+          : needsHomeZone
           ? "Set your Home Zone from the dropdown to start"
           : personalizedPlaceholder
       }
@@ -378,7 +384,13 @@ export default function Command(
         >
           <List.Dropdown.Item
             value={NO_ZONE_VALUE}
-            title={needsHomeZone ? "Set Home Zone..." : "Change Home Zone..."}
+            title={
+              !selectionHydrated
+                ? "Loading Home Zone..."
+                : needsHomeZone
+                  ? "Set Home Zone..."
+                  : "Change Home Zone..."
+            }
             icon={Icon.Pin}
           />
           <List.Dropdown.Section title="Active Towns">
@@ -394,15 +406,11 @@ export default function Command(
       }
       throttle
     >
-      {needsHomeZone ? (
+      {!selectionHydrated ? null : needsHomeZone ? (
         <List.Section title="Setup">
           <List.Item
             title="Set your Home Zone to continue"
-            subtitle={
-              zonesLoading
-                ? "Loading active towns..."
-                : "Open the Home Zone dropdown above and choose your Town."
-            }
+            subtitle="Open the Home Zone dropdown above and choose your Town."
             icon={Icon.Pin}
             actions={
               <ActionPanel>
