@@ -31,6 +31,7 @@ const FALLBACK_API_QUERY = "what's on this week";
 const HOME_ZONE_STORAGE_KEY = "townspot-home-zone-id";
 const NO_ZONE_VALUE = "__unset__";
 const ZONE_VALUE_PREFIX = "zone:";
+const SMALL_DOT = "·";
 
 const useDebouncedValue = <T,>(value: T, waitMs: number): T => {
   const [debounced, setDebounced] = useState(value);
@@ -73,17 +74,17 @@ const toCategoriesLabel = (tags: string[]): string =>
 
 const zoneActivityLabel = (zone: ActiveZoneOption): string => {
   if (Number.isFinite(zone.activeUsers)) {
-    return `${zone.activeUsers} active this week`;
+    return `${zone.activeUsers} Local's active`;
   }
   if (Number.isFinite(zone.weeklyEventsCount)) {
-    return `${zone.weeklyEventsCount} events this week`;
+    return `${zone.weeklyEventsCount} Local's active`;
   }
   return "";
 };
 
 const zoneDropdownTitle = (zone: ActiveZoneOption): string => {
   const activity = zoneActivityLabel(zone);
-  return activity ? `${zone.name} • ${activity}` : zone.name;
+  return activity ? `${zone.name} ${SMALL_DOT} ${activity}` : zone.name;
 };
 
 const CATEGORY_ALL = "All";
@@ -354,8 +355,8 @@ export default function Command(
   const activeTownName = selectedZone?.name || "Home Zone";
   const activeThisWeek = selectedZone?.activeUsers ?? selectedZone?.weeklyEventsCount;
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
-    ? `${activeThisWeek} active this week`
-    : "Active this week";
+    ? `${activeThisWeek} Local's active`
+    : "Local's active";
   const selectedZoneTitle = selectedZone ? zoneDropdownTitle(selectedZone) : "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
@@ -488,7 +489,7 @@ export default function Command(
                 ? "Loading Home Zone..."
                 : needsHomeZone
                   ? "Set Home Zone..."
-                  : selectedZoneTitle || `${activeTownName} • ${activeThisWeekLabel}`
+                  : selectedZoneTitle || `${activeTownName} ${SMALL_DOT} ${activeThisWeekLabel}`
             }
             icon={Icon.Pin}
           />
