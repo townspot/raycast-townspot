@@ -26,7 +26,7 @@
   "commands": [
     {
       "name": "ask",
-      "title": "Ask TownSpot",
+      "title": "TownSpot",
       "icon": "icon.png",
       "description": "Ask what's on in your Town with conversational search.",
       "mode": "view",

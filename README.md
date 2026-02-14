@@ -31,7 +31,7 @@ If you see `fetch failed`, check:
 
 ## Command
 
-- **Ask TownSpot** (`ask`)
+- **TownSpot** (`ask`)
   - First use requires setting a `Home Zone` before event results load.
   - Opens with upcoming listings and defaults to `Today + Tomorrow`.
   - Type naturally in the search bar (`today`, `this weekend`, `kids and family`).
