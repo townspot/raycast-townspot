@@ -15,6 +15,7 @@ import {
   relativeStartTag,
   TimeWindow,
 } from "./lib/event-listing";
+import { splitEventTags } from "./lib/event-tags";
 import { QUICK_QUERY_PRESETS } from "./lib/query-presets";
 import { askTownspot } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
@@ -68,8 +69,8 @@ const parseZoneId = (value: string): number | null => {
 const toCategoriesLabel = (tags: string[]): string =>
   tags
     .filter(Boolean)
-    .slice(0, 3)
-    .join(", ");
+    .slice(0, 2)
+    .join(" · ");
 
 const CATEGORY_ALL = "All";
 const DEFAULT_TIME_WINDOW: TimeWindow = "today_tomorrow";
@@ -290,8 +291,9 @@ export default function Command(
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
     for (const event of responseForActiveTown?.events || []) {
-      for (const tag of event.tags || []) {
-        const value = String(tag || "").trim();
+      const tagParts = splitEventTags(event.tags || []);
+      for (const tag of tagParts.categories) {
+        const value = String(tag).trim();
         if (!value) continue;
         values.add(value);
       }
@@ -309,7 +311,7 @@ export default function Command(
   const categoryFilteredEvents = useMemo(
     () =>
       (responseForActiveTown?.events || []).filter((event) =>
-        eventMatchesCategory(event.tags || [], selectedCategory),
+        eventMatchesCategory(splitEventTags(event.tags || []).categories, selectedCategory),
       ),
     [responseForActiveTown, selectedCategory],
   );
@@ -436,6 +438,7 @@ export default function Command(
                   const resolvedEventUrl = resolveEventUrl(event.url);
                   const timeLabel = formatEventTime(event.startTime, sectionTimezone);
                   const liveTag = relativeStartTag(event);
+                  const tagParts = splitEventTags(event.tags || []);
                   const accessories: List.Item.Accessory[] = [];
                   if (liveTag === "NOW") {
                     accessories.push({
@@ -444,11 +447,24 @@ export default function Command(
                   } else if (liveTag) {
                     accessories.push({ tag: liveTag });
                   }
+                  if (tagParts.frequency) {
+                    accessories.push({
+                      tag: { value: tagParts.frequency, color: Color.Blue },
+                    });
+                  }
+                  if (tagParts.price) {
+                    accessories.push({
+                      tag: {
+                        value: tagParts.price,
+                        color: tagParts.price === "Free" ? Color.Green : Color.Orange,
+                      },
+                    });
+                  }
                   if (timeLabel) {
                     accessories.push({ text: timeLabel });
                   }
-                  const categoriesLabel = toCategoriesLabel(event.tags);
-                  const subtitleBase = event.venueName || activeTownName;
+                  const categoriesLabel = toCategoriesLabel(tagParts.categories);
+                  const subtitleBase = `📍 ${event.venueName || activeTownName}`;
                   const subtitle = categoriesLabel
                     ? `${subtitleBase} · ${categoriesLabel}`
                     : subtitleBase;

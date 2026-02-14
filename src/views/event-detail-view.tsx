@@ -7,6 +7,7 @@ import {
   googleMapsUrl,
 } from "../lib/event-details";
 import { formatEventTime } from "../lib/event-listing";
+import { splitEventTags } from "../lib/event-tags";
 import { RaycastEvent } from "../types";
 
 type EventDetailViewProps = {
@@ -52,7 +53,8 @@ const buildMarkdown = (
 };
 
 const categoriesLabel = (details: EventDetails | null, event: RaycastEvent): string => {
-  const categories = details?.categories?.length ? details.categories : event.tags;
+  const fallbackCategories = splitEventTags(event.tags).categories;
+  const categories = details?.categories?.length ? details.categories : fallbackCategories;
   return categories && categories.length ? categories.join(", ") : "None listed";
 };
 
