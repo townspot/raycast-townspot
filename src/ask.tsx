@@ -506,22 +506,15 @@ export default function Command(
     !shouldShowLoadingResults &&
     (hasSeenTownData || Boolean(displayResponseForActiveTown)) &&
     daySections.length === 0;
-  const categoryPillAccessories = useMemo(
-    () =>
-      categoryOptions
-        .filter((category) => category !== CATEGORY_ALL && isMeaningfulCategory(category))
-        .slice(0, 6)
-        .map((category) => ({
-          tag: {
-            value: category,
-            color:
-              normalizeCategory(category) === normalizeCategory(selectedCategory)
-                ? Color.Blue
-                : Color.SecondaryText,
-          },
-        })),
-    [categoryOptions, selectedCategory],
-  );
+  const categorySummaryText = useMemo(() => {
+    const availableCount = categoryOptions.filter(
+      (category) => category !== CATEGORY_ALL && isMeaningfulCategory(category),
+    ).length;
+    if (selectedCategory === CATEGORY_ALL) {
+      return `${availableCount} categories`;
+    }
+    return selectedCategory;
+  }, [categoryOptions, selectedCategory]);
 
   const setHomeZone = async (zone: ActiveZoneOption): Promise<void> => {
     setSelectedTownValue(toZoneValue(zone.id));
@@ -661,7 +654,7 @@ export default function Command(
                   : `Selected: ${selectedCategory}. Press Enter, then use ↑/↓.`
               }
               icon={Icon.AppWindowGrid2x2}
-              accessories={categoryPillAccessories}
+              accessories={[{ text: categorySummaryText, icon: Icon.ChevronRight }]}
               actions={
                 <ActionPanel>
                   <Action.Push
