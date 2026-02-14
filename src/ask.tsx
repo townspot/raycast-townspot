@@ -648,6 +648,43 @@ export default function Command(
         <>
           <List.Section title="Filters">
             <List.Item
+              title="When"
+              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter, then use ↑/↓.`}
+              icon={Icon.Clock}
+              accessories={[{ text: `${timeWindowEvents.length} events` }]}
+              actions={
+                <ActionPanel>
+                  <Action.Push
+                    title="Choose Time Window"
+                    target={
+                      <TimeWindowPickerView
+                        options={TIME_WINDOW_OPTIONS}
+                        selectedTimeWindow={selectedTimeWindow}
+                        onSelect={applyTimeWindow}
+                      />
+                    }
+                  />
+                  <Action
+                    title="Next Time Window"
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
+                    onAction={nextTimeWindow}
+                  />
+                  <Action
+                    title="Previous Time Window"
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "b" }}
+                    onAction={previousTimeWindow}
+                  />
+                  {TIME_WINDOW_OPTIONS.map((option) => (
+                    <Action
+                      key={option.id}
+                      title={`Show ${option.title}`}
+                      onAction={() => applyTimeWindow(option.id)}
+                    />
+                  ))}
+                </ActionPanel>
+              }
+            />
+            <List.Item
               title="Categories"
               subtitle={
                 selectedCategory === CATEGORY_ALL
@@ -685,49 +722,12 @@ export default function Command(
                   {categoryOptions
                     .filter((category) => category !== CATEGORY_ALL && isMeaningfulCategory(category))
                     .map((category) => (
-                    <Action
-                      key={category}
-                      title={`Show ${category}`}
-                      onAction={() => applyCategory(category)}
-                    />
-                  ))}
-                </ActionPanel>
-              }
-            />
-            <List.Item
-              title="When"
-              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter, then use ↑/↓.`}
-              icon={Icon.Clock}
-              accessories={[{ text: `${timeWindowEvents.length} events` }]}
-              actions={
-                <ActionPanel>
-                  <Action.Push
-                    title="Choose Time Window"
-                    target={
-                      <TimeWindowPickerView
-                        options={TIME_WINDOW_OPTIONS}
-                        selectedTimeWindow={selectedTimeWindow}
-                        onSelect={applyTimeWindow}
+                      <Action
+                        key={category}
+                        title={`Show ${category}`}
+                        onAction={() => applyCategory(category)}
                       />
-                    }
-                  />
-                  <Action
-                    title="Next Time Window"
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
-                    onAction={nextTimeWindow}
-                  />
-                  <Action
-                    title="Previous Time Window"
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "b" }}
-                    onAction={previousTimeWindow}
-                  />
-                  {TIME_WINDOW_OPTIONS.map((option) => (
-                    <Action
-                      key={option.id}
-                      title={`Show ${option.title}`}
-                      onAction={() => applyTimeWindow(option.id)}
-                    />
-                  ))}
+                    ))}
                 </ActionPanel>
               }
             />
