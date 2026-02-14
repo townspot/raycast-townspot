@@ -445,10 +445,11 @@ export default function Command(
       void updateCommandMetadata({ subtitle: "Set Hometown" });
       return;
     }
+    const activityCount = Number.isFinite(activeThisWeek) ? String(activeThisWeek) : "0";
     void updateCommandMetadata({
-      subtitle: `${selectedZone.name} ${SMALL_DOT} this week`,
+      subtitle: `${activityCount} local active this week`,
     });
-  }, [selectionHydrated, needsHomeZone, selectedZone]);
+  }, [selectionHydrated, needsHomeZone, selectedZone, activeThisWeek]);
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
