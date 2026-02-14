@@ -110,7 +110,7 @@ type TimeWindowOption = {
 };
 
 const TIME_WINDOW_OPTIONS: TimeWindowOption[] = [
-  { id: "now", title: "NOW" },
+  { id: "now", title: "Happening now" },
   { id: "all_upcoming", title: "All Upcoming" },
   { id: "today", title: "Today" },
   {
@@ -169,6 +169,7 @@ const inferTimeWindowFromQuery = (value: string): TimeWindow | null => {
   ) {
     return "now";
   }
+  if (query.includes("all upcoming")) return "all_upcoming";
   if (query.includes("tomorrow")) return "today_tomorrow";
   if (query.includes("this weekend")) return "next_3_days";
   if (query.includes("this week")) return "this_week";
@@ -177,6 +178,39 @@ const inferTimeWindowFromQuery = (value: string): TimeWindow | null => {
   if (query.includes("today")) return "today";
   if (query.includes("tonight")) return "today";
   return null;
+};
+
+const hasExplicitTimeIntent = (value: string): boolean => {
+  const query = normalizeWindowQuery(value);
+  if (!query) return false;
+  return (
+    query.includes("right now") ||
+    query.includes("happening now") ||
+    query.includes("on now") ||
+    query.includes("live now") ||
+    query === "now" ||
+    query.startsWith("now ") ||
+    query.includes("today") ||
+    query.includes("tomorrow") ||
+    query.includes("tonight") ||
+    query.includes("this weekend") ||
+    query.includes("this week") ||
+    query.includes("next week") ||
+    query.includes("next 3 days") ||
+    query.includes("next 7 days") ||
+    query.includes("all upcoming")
+  );
+};
+
+const windowHintForApi = (timeWindow: TimeWindow): string => {
+  if (timeWindow === "now") return "happening now";
+  if (timeWindow === "today") return "today";
+  if (timeWindow === "today_tomorrow") return "today and tomorrow";
+  if (timeWindow === "next_3_days") return "next 3 days";
+  if (timeWindow === "next_7_days") return "next 7 days";
+  if (timeWindow === "this_week") return "this week";
+  if (timeWindow === "all_upcoming") return "all upcoming";
+  return "next 7 days";
 };
 
 export default function Command(
@@ -208,8 +242,15 @@ export default function Command(
   );
   const queryForApi = useMemo(() => {
     const trimmed = debouncedSearchText.trim();
-    return trimmed || FALLBACK_API_QUERY;
-  }, [debouncedSearchText]);
+    const hint = windowHintForApi(selectedTimeWindow);
+    if (!trimmed) {
+      return `what's on ${hint}`;
+    }
+    if (hasExplicitTimeIntent(trimmed)) {
+      return trimmed;
+    }
+    return `${trimmed} ${hint}`.trim();
+  }, [debouncedSearchText, selectedTimeWindow]);
 
   useEffect(() => {
     const inferred = inferTimeWindowFromQuery(debouncedSearchText);
@@ -709,7 +750,7 @@ export default function Command(
                   const accessories: List.Item.Accessory[] = [];
                   const statusLabel =
                     liveTag === "NOW"
-                      ? "· NOW"
+                      ? "· happening now"
                       : liveTag
                         ? `· ${liveTag}`
                         : "";
