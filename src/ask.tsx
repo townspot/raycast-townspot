@@ -6,6 +6,7 @@ import {
   List,
   LocalStorage,
   getPreferenceValues,
+  updateCommandMetadata,
 } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -393,6 +394,20 @@ export default function Command(
     : "locals active";
   const selectedZoneTitle = selectedZone ? zoneDropdownTitle(selectedZone) : "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
+
+  useEffect(() => {
+    if (!selectionHydrated) {
+      void updateCommandMetadata({ subtitle: "Loading home zone..." });
+      return;
+    }
+    if (needsHomeZone || !selectedZone) {
+      void updateCommandMetadata({ subtitle: "Set Home Zone" });
+      return;
+    }
+    void updateCommandMetadata({
+      subtitle: `${selectedZone.name} ${SMALL_DOT} ${activeThisWeekLabel}`,
+    });
+  }, [selectionHydrated, needsHomeZone, selectedZone, activeThisWeekLabel]);
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
