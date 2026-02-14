@@ -546,12 +546,12 @@ export default function Command(
                   />
                   <Action
                     title="Next Category"
-                    shortcut={{ modifiers: ["cmd"], key: "." }}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "]" }}
                     onAction={nextCategory}
                   />
                   <Action
                     title="Previous Category"
-                    shortcut={{ modifiers: ["cmd"], key: "," }}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "[" }}
                     onAction={previousCategory}
                   />
                   {categoryOptions
@@ -648,12 +648,12 @@ export default function Command(
                             />
                             <Action
                               title="Next Category"
-                              shortcut={{ modifiers: ["cmd"], key: "." }}
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "]" }}
                               onAction={nextCategory}
                             />
                             <Action
                               title="Previous Category"
-                              shortcut={{ modifiers: ["cmd"], key: "," }}
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "[" }}
                               onAction={previousCategory}
                             />
                             <Action
