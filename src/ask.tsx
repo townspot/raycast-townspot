@@ -626,7 +626,7 @@ export default function Command(
         <List.Section title="Setup">
           <List.Item
             title="Set your Hometown to continue"
-            subtitle="Open the Hometown dropdown above and choose your Town."
+            subtitle="Open the Hometown dropdown above and choose your town."
             icon={Icon.Pin}
             actions={
               <ActionPanel>
@@ -837,7 +837,7 @@ export default function Command(
             <List.Section title="Today">
               <List.Item
                 title="Loading events…"
-                subtitle="Pulling the latest listings for your Town."
+                subtitle="Pulling the latest listings for your town."
                 icon={Icon.Clock}
               />
             </List.Section>

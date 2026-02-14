@@ -28,7 +28,7 @@
       "name": "ask",
       "title": "TownSpot",
       "icon": "icon.png",
-      "description": "Ask what's on in your Town with conversational search.",
+      "description": "Ask what's on in your town with conversational search.",
       "mode": "view",
       "path": "ask",
       "keywords": ["events", "townspot", "weekend", "music"],
