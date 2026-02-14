@@ -56,7 +56,6 @@ export const fetchActiveZones = async (
 ): Promise<ActiveZoneOption[]> => {
   const normalizedBaseUrl = normalizeApiBaseUrl(apiBaseUrl).replace(/\/$/, "");
   const endpoints = [
-    `${normalizedBaseUrl}/locations/list?includeHidden=true`,
     `${normalizedBaseUrl}/locations/list`,
     `${normalizedBaseUrl}/list`,
   ];
