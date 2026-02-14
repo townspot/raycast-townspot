@@ -71,6 +71,21 @@ const toCategoriesLabel = (tags: string[]): string =>
     .slice(0, 2)
     .join(" · ");
 
+const zoneActivityLabel = (zone: ActiveZoneOption): string => {
+  if (Number.isFinite(zone.activeUsers)) {
+    return `${zone.activeUsers} active this week`;
+  }
+  if (Number.isFinite(zone.weeklyEventsCount)) {
+    return `${zone.weeklyEventsCount} events this week`;
+  }
+  return "";
+};
+
+const zoneDropdownTitle = (zone: ActiveZoneOption): string => {
+  const activity = zoneActivityLabel(zone);
+  return activity ? `${zone.name} • ${activity}` : zone.name;
+};
+
 const CATEGORY_ALL = "All";
 const DEFAULT_TIME_WINDOW: TimeWindow = "today_tomorrow";
 
@@ -345,6 +360,7 @@ export default function Command(
   const activeThisWeekLabel = Number.isFinite(activeThisWeek)
     ? `${activeThisWeek} active this week`
     : "Active this week";
+  const selectedZoneTitle = selectedZone ? zoneDropdownTitle(selectedZone) : "";
   const personalizedPlaceholder = `What's on in ${activeTownName}? Try kids, free, music, now...`;
 
   const categoryOptions = useMemo(() => {
@@ -459,7 +475,7 @@ export default function Command(
                 ? "Loading Home Zone..."
                 : needsHomeZone
                   ? "Set Home Zone..."
-                  : `${activeTownName} · ${activeThisWeekLabel}`
+                  : selectedZoneTitle || `${activeTownName} • ${activeThisWeekLabel}`
             }
             icon={Icon.Pin}
           />
@@ -468,14 +484,7 @@ export default function Command(
               <List.Dropdown.Item
                 key={zone.id}
                 value={toZoneValue(zone.id)}
-                title={zone.name}
-                subtitle={
-                  Number.isFinite(zone.activeUsers)
-                    ? `${zone.activeUsers} active this week`
-                    : Number.isFinite(zone.weeklyEventsCount)
-                      ? `${zone.weeklyEventsCount} events this week`
-                      : ""
-                }
+                title={zoneDropdownTitle(zone)}
               />
             ))}
           </List.Dropdown.Section>
@@ -511,8 +520,8 @@ export default function Command(
               title="Categories"
               subtitle={
                 selectedCategory === CATEGORY_ALL
-                  ? "All categories"
-                  : `Selected: ${selectedCategory}`
+                  ? "All categories. Press Enter, then use ↑/↓ and Enter."
+                  : `Selected: ${selectedCategory}. Press Enter to change.`
               }
               icon={Icon.AppWindowGrid2x2}
               accessories={categoryPillAccessories}
