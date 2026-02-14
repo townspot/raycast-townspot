@@ -446,9 +446,9 @@ export default function Command(
       return;
     }
     void updateCommandMetadata({
-      subtitle: `${selectedZone.name} ${SMALL_DOT} this week ${SMALL_DOT} ${activeThisWeekLabel}`,
+      subtitle: `${selectedZone.name} ${SMALL_DOT} this week`,
     });
-  }, [selectionHydrated, needsHomeZone, selectedZone, activeThisWeekLabel]);
+  }, [selectionHydrated, needsHomeZone, selectedZone]);
 
   const categoryOptions = useMemo(() => {
     const values = new Set<string>();
