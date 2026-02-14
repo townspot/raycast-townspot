@@ -596,7 +596,7 @@ export default function Command(
                   const accessories: List.Item.Accessory[] = [];
                   const statusLabel =
                     liveTag === "NOW"
-                      ? "• now"
+                      ? "• Now"
                       : liveTag
                         ? `• ${liveTag}`
                         : "";
