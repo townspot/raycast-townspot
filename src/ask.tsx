@@ -596,9 +596,9 @@ export default function Command(
                   const accessories: List.Item.Accessory[] = [];
                   const statusLabel =
                     liveTag === "NOW"
-                      ? "• Now"
+                      ? "· Now"
                       : liveTag
-                        ? `• ${liveTag}`
+                        ? `· ${liveTag}`
                         : "";
                   const categoriesLabel = toCategoriesLabel(tagParts.categories);
                   const subtitle = [statusLabel, categoriesLabel].filter(Boolean).join(" · ");
