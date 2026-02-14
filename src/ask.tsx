@@ -562,39 +562,27 @@ export default function Command(
                   const liveTag = relativeStartTag(event);
                   const tagParts = splitEventTags(event.tags || []);
                   const accessories: List.Item.Accessory[] = [];
-                  if (liveTag === "NOW") {
-                    accessories.push({
-                      tag: { value: liveTag, color: Color.Green },
-                    });
-                  } else if (liveTag) {
-                    accessories.push({ tag: liveTag });
-                  }
-                  if (tagParts.frequency) {
-                    accessories.push({
-                      tag: { value: tagParts.frequency, color: Color.Blue },
-                    });
-                  }
-                  if (tagParts.price) {
-                    accessories.push({
-                      tag: {
-                        value: tagParts.price,
-                        color: tagParts.price === "Free" ? Color.Green : Color.Orange,
-                      },
-                    });
-                  }
-                  if (timeLabel) {
-                    accessories.push({ text: timeLabel });
-                  }
+                  const statusLabel =
+                    liveTag === "NOW"
+                      ? "🟠 now"
+                      : liveTag
+                        ? `🟢 ${liveTag}`
+                        : "";
                   const categoriesLabel = toCategoriesLabel(tagParts.categories);
-                  const subtitleBase = `📍 ${event.venueName || activeTownName}`;
-                  const subtitle = categoriesLabel
-                    ? `${subtitleBase} · ${categoriesLabel}`
-                    : subtitleBase;
+                  const subtitle = [statusLabel, categoriesLabel].filter(Boolean).join(" · ");
+                  accessories.push({
+                    icon: Icon.Pin,
+                    text: {
+                      value: event.venueName || activeTownName,
+                      color: Color.SecondaryText,
+                    },
+                  });
+                  const title = [timeLabel, event.title].filter(Boolean).join("  ");
 
                   return (
                     <List.Item
                       key={event.id}
-                      title={event.title}
+                      title={title}
                       subtitle={subtitle}
                       icon={{ source: "icon.png" }}
                       accessories={accessories}
