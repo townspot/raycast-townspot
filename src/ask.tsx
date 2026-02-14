@@ -446,7 +446,7 @@ export default function Command(
       return;
     }
     void updateCommandMetadata({
-      subtitle: `${selectedZone.name} ${SMALL_DOT} ${activeThisWeekLabel} this week`,
+      subtitle: `${selectedZone.name} ${SMALL_DOT} this week ${SMALL_DOT} ${activeThisWeekLabel}`,
     });
   }, [selectionHydrated, needsHomeZone, selectedZone, activeThisWeekLabel]);
 
