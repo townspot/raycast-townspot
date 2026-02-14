@@ -19,7 +19,9 @@ import { splitEventTags } from "./lib/event-tags";
 import { askTownspot } from "./lib/townspot";
 import { ActiveZoneOption, fetchActiveZones } from "./lib/zones";
 import { RaycastResponse } from "./types";
+import { CategoryPickerView } from "./views/category-picker-view";
 import { EventDetailView } from "./views/event-detail-view";
+import { TimeWindowPickerView } from "./views/time-window-picker-view";
 
 type Preferences = {
   apiBaseUrl: string;
@@ -71,6 +73,13 @@ const toCategoriesLabel = (tags: string[]): string =>
     .filter(Boolean)
     .slice(0, 2)
     .join(" · ");
+
+const cleanCategoryLabel = (value: string): string =>
+  String(value || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[·•\-–—\s]+|[·•\-–—\s]+$/g, "")
+    .trim();
 
 const zoneActivityLabel = (zone: ActiveZoneOption): string => {
   if (Number.isFinite(zone.activeUsers)) {
@@ -386,7 +395,7 @@ export default function Command(
     for (const event of displayResponseForActiveTown?.events || []) {
       const tagParts = splitEventTags(event.tags || []);
       for (const tag of tagParts.categories) {
-        const value = String(tag).trim();
+        const value = cleanCategoryLabel(tag);
         if (!value) continue;
         values.add(value);
       }
@@ -588,13 +597,23 @@ export default function Command(
               title="Categories"
               subtitle={
                 selectedCategory === CATEGORY_ALL
-                  ? "All categories. Enter cycles. ⌘⇧N/⌘⇧P."
-                  : `Selected: ${selectedCategory}. Enter cycles. ⌘⇧N/⌘⇧P.`
+                  ? "All categories. Press Enter, then use ↑/↓."
+                  : `Selected: ${selectedCategory}. Press Enter, then use ↑/↓.`
               }
               icon={Icon.AppWindowGrid2x2}
               accessories={categoryPillAccessories}
               actions={
                 <ActionPanel>
+                  <Action.Push
+                    title="Choose Category"
+                    target={
+                      <CategoryPickerView
+                        categories={categoryOptions}
+                        selectedCategory={selectedCategory}
+                        onSelect={applyCategory}
+                      />
+                    }
+                  />
                   <Action
                     title="Next Category"
                     shortcut={{ modifiers: ["cmd", "shift"], key: "n" }}
@@ -623,11 +642,21 @@ export default function Command(
             />
             <List.Item
               title="When"
-              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Enter cycles. ⌘⇧M/⌘⇧B.`}
+              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Press Enter, then use ↑/↓.`}
               icon={Icon.Clock}
               accessories={[{ text: `${timeWindowEvents.length} events` }]}
               actions={
                 <ActionPanel>
+                  <Action.Push
+                    title="Choose Time Window"
+                    target={
+                      <TimeWindowPickerView
+                        options={TIME_WINDOW_OPTIONS}
+                        selectedTimeWindow={selectedTimeWindow}
+                        onSelect={applyTimeWindow}
+                      />
+                    }
+                  />
                   <Action
                     title="Next Time Window"
                     shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
