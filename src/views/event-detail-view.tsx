@@ -17,43 +17,49 @@ type EventDetailViewProps = {
   apiBaseUrl: string;
 };
 
-const formatDateTime = (value: string | undefined | null, timezone: string): string => {
-  if (!value) return "TBC";
+const parseDateValue = (value: string | undefined | null): Date | null => {
+  if (!value) return null;
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "TBC";
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const formatClock = (value: Date | null, timezone: string): string => {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone || "Europe/London",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(value);
+};
+
+const formatDateLabel = (value: Date | null, timezone: string): string => {
+  if (!value) return "";
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone || "Europe/London",
     weekday: "short",
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed);
+  }).format(value);
 };
 
-const formatClock = (value: string | undefined | null, timezone: string): string => {
+const formatDateKey = (value: Date | null, timezone: string): string => {
   if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: timezone || "Europe/London",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed);
-};
-
-const formatDateKey = (value: string | undefined | null, timezone: string): string => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone || "Europe/London",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(parsed);
+  }).format(value);
+};
+
+const formatDateTime = (value: Date | null, timezone: string): string => {
+  if (!value) return "TBC";
+  const dayLabel = formatDateLabel(value, timezone);
+  const timeLabel = formatClock(value, timezone);
+  if (dayLabel && timeLabel) return `${dayLabel}, ${timeLabel}`;
+  return dayLabel || timeLabel || "TBC";
 };
 
 const formatTimeRange = (
@@ -61,18 +67,27 @@ const formatTimeRange = (
   endValue: string | undefined | null,
   timezone: string,
 ): string => {
-  const start = formatDateTime(startValue, timezone);
-  if (!endValue) return start;
+  const startDate = parseDateValue(startValue);
+  const endDate = parseDateValue(endValue);
+  const start = formatDateTime(startDate, timezone);
+  if (!endDate) return start;
 
-  const end = formatDateTime(endValue, timezone);
+  const end = formatDateTime(endDate, timezone);
   if (start === "TBC") return end;
   if (end === "TBC") return start;
+  if (startDate && endDate && startDate.getTime() === endDate.getTime()) return start;
   if (start === end) return start;
 
-  const sameDay = formatDateKey(startValue, timezone) === formatDateKey(endValue, timezone);
+  const sameDay = formatDateKey(startDate, timezone) === formatDateKey(endDate, timezone);
   if (sameDay) {
-    const endClock = formatClock(endValue, timezone);
-    return endClock ? `${start} to ${endClock}` : start;
+    const dayLabel = formatDateLabel(startDate, timezone);
+    const startClock = formatClock(startDate, timezone);
+    const endClock = formatClock(endDate, timezone);
+    if (dayLabel && startClock && endClock) {
+      if (startClock === endClock) return `${dayLabel}, ${startClock}`;
+      return `${dayLabel}, ${startClock} to ${endClock}`;
+    }
+    return start;
   }
 
   return `${start} to ${end}`;
