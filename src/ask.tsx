@@ -182,8 +182,14 @@ export default function Command(
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORY_ALL);
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<TimeWindow>(DEFAULT_TIME_WINDOW);
+  const [manualCategoryQuery, setManualCategoryQuery] = useState("");
+  const [manualTimeWindowQuery, setManualTimeWindowQuery] = useState("");
 
   const debouncedSearchText = useDebouncedValue(searchText, 350);
+  const normalizedQuery = useMemo(
+    () => normalizeWindowQuery(debouncedSearchText),
+    [debouncedSearchText],
+  );
   const queryForApi = useMemo(() => {
     const trimmed = debouncedSearchText.trim();
     return trimmed || FALLBACK_API_QUERY;
@@ -191,16 +197,17 @@ export default function Command(
 
   useEffect(() => {
     const inferred = inferTimeWindowFromQuery(debouncedSearchText);
+    if (manualTimeWindowQuery === normalizedQuery) return;
     if (!inferred || inferred === selectedTimeWindow) return;
     setSelectedTimeWindow(inferred);
-  }, [debouncedSearchText, selectedTimeWindow]);
+  }, [debouncedSearchText, manualTimeWindowQuery, normalizedQuery, selectedTimeWindow]);
 
   useEffect(() => {
     const inferred = inferCategoryFromQuery(debouncedSearchText);
-    if (inferred && inferred !== selectedCategory) {
-      setSelectedCategory(inferred);
-    }
-  }, [debouncedSearchText, selectedCategory]);
+    if (manualCategoryQuery === normalizedQuery) return;
+    if (!inferred || inferred === selectedCategory) return;
+    setSelectedCategory(inferred);
+  }, [debouncedSearchText, manualCategoryQuery, normalizedQuery, selectedCategory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -440,7 +447,13 @@ export default function Command(
     await setHomeZone(zone);
   };
 
+  const applyCategory = (category: string): void => {
+    setManualCategoryQuery(normalizedQuery);
+    setSelectedCategory(category);
+  };
+
   const applyTimeWindow = (timeWindow: TimeWindow): void => {
+    setManualTimeWindowQuery(normalizedQuery);
     setSelectedTimeWindow(timeWindow);
   };
 
@@ -450,7 +463,7 @@ export default function Command(
     const currentIndex = Math.max(0, ordered.indexOf(selectedCategory));
     const nextIndex =
       (currentIndex + direction + ordered.length) % ordered.length;
-    setSelectedCategory(ordered[nextIndex]);
+    applyCategory(ordered[nextIndex]);
   };
 
   const nextCategory = (): void => {
@@ -459,6 +472,25 @@ export default function Command(
 
   const previousCategory = (): void => {
     cycleCategory(-1);
+  };
+
+  const cycleTimeWindow = (direction: 1 | -1): void => {
+    const ordered = TIME_WINDOW_OPTIONS;
+    if (!ordered.length) return;
+    const currentIndex = Math.max(
+      0,
+      ordered.findIndex((option) => option.id === selectedTimeWindow),
+    );
+    const nextIndex = (currentIndex + direction + ordered.length) % ordered.length;
+    applyTimeWindow(ordered[nextIndex].id);
+  };
+
+  const nextTimeWindow = (): void => {
+    cycleTimeWindow(1);
+  };
+
+  const previousTimeWindow = (): void => {
+    cycleTimeWindow(-1);
   };
 
   return (
@@ -534,26 +566,26 @@ export default function Command(
               title="Categories"
               subtitle={
                 selectedCategory === CATEGORY_ALL
-                  ? "All categories. Press Enter, then use ↑/↓ and Enter."
-                  : `Selected: ${selectedCategory}. Press Enter to change.`
+                  ? "All categories. Enter cycles. ⌘⇧N/⌘⇧P."
+                  : `Selected: ${selectedCategory}. Enter cycles. ⌘⇧N/⌘⇧P.`
               }
               icon={Icon.AppWindowGrid2x2}
               accessories={categoryPillAccessories}
               actions={
                 <ActionPanel>
                   <Action
-                    title="Show All Categories"
-                    onAction={() => setSelectedCategory(CATEGORY_ALL)}
-                  />
-                  <Action
                     title="Next Category"
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "]" }}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "n" }}
                     onAction={nextCategory}
                   />
                   <Action
                     title="Previous Category"
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "[" }}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                     onAction={previousCategory}
+                  />
+                  <Action
+                    title="Show All Categories"
+                    onAction={() => applyCategory(CATEGORY_ALL)}
                   />
                   {categoryOptions
                     .filter((category) => category !== CATEGORY_ALL)
@@ -561,7 +593,7 @@ export default function Command(
                     <Action
                       key={category}
                       title={`Show ${category}`}
-                      onAction={() => setSelectedCategory(category)}
+                      onAction={() => applyCategory(category)}
                     />
                   ))}
                 </ActionPanel>
@@ -569,11 +601,21 @@ export default function Command(
             />
             <List.Item
               title="When"
-              subtitle={timeWindowLabel(selectedTimeWindow)}
+              subtitle={`${timeWindowLabel(selectedTimeWindow)}. Enter cycles. ⌘⇧M/⌘⇧B.`}
               icon={Icon.Clock}
               accessories={[{ text: `${timeWindowEvents.length} events` }]}
               actions={
                 <ActionPanel>
+                  <Action
+                    title="Next Time Window"
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
+                    onAction={nextTimeWindow}
+                  />
+                  <Action
+                    title="Previous Time Window"
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "b" }}
+                    onAction={previousTimeWindow}
+                  />
                   {TIME_WINDOW_OPTIONS.map((option) => (
                     <Action
                       key={option.id}
@@ -649,13 +691,23 @@ export default function Command(
                             />
                             <Action
                               title="Next Category"
-                              shortcut={{ modifiers: ["cmd", "shift"], key: "]" }}
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "n" }}
                               onAction={nextCategory}
                             />
                             <Action
                               title="Previous Category"
-                              shortcut={{ modifiers: ["cmd", "shift"], key: "[" }}
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                               onAction={previousCategory}
+                            />
+                            <Action
+                              title="Next Time Window"
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
+                              onAction={nextTimeWindow}
+                            />
+                            <Action
+                              title="Previous Time Window"
+                              shortcut={{ modifiers: ["cmd", "shift"], key: "b" }}
+                              onAction={previousTimeWindow}
                             />
                             <Action
                               title="Show Today + Tomorrow"
@@ -663,11 +715,11 @@ export default function Command(
                             />
                             <Action
                               title="Show Kids Events"
-                              onAction={() => setSelectedCategory("Kids")}
+                              onAction={() => applyCategory("Kids")}
                             />
                             <Action
                               title="Show All Categories"
-                              onAction={() => setSelectedCategory(CATEGORY_ALL)}
+                              onAction={() => applyCategory(CATEGORY_ALL)}
                             />
                           </ActionPanel.Section>
                         </ActionPanel>
