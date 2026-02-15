@@ -8,7 +8,6 @@ export type ActiveTown = {
   id: number;
   name: string;
   slug: string;
-  timezone: string;
 };
 
 type BuildAiPromptInput = {
@@ -86,6 +85,5 @@ export const resolveActiveTown = async (apiBaseUrl: string): Promise<ActiveTown>
     id: zone.id,
     name: zone.name,
     slug: zone.slug,
-    timezone: "Europe/London",
   };
 };
