@@ -18,10 +18,20 @@ declare namespace Preferences {
   /** Locale - API locale (en-GB, es-ES, ca-ES) */
   "locale": string
 }
+  /** Preferences accessible in the `ask-townspot-ai` command */
+  export type AskTownspotAi = ExtensionPreferences & {
+  /** Locale - API locale (en-GB, es-ES, ca-ES) */
+  "locale": string
+}
 }
 
 declare namespace Arguments {
   /** Arguments passed to the `ask` command */
   export type Ask = {}
+  /** Arguments passed to the `ask-townspot-ai` command */
+  export type AskTownspotAi = {
+  /** Ask TownSpot AI */
+  "prompt": string
+}
 }
 
