@@ -206,8 +206,17 @@ const spottedByMarkdown = (
     return `Spotted by ${safeName}${suffix}`;
   }
 
-  const safeAvatarUrl = avatarUrl.replace(/"/g, "%22");
-  return `Spotted by <img src="${safeAvatarUrl}" width="18" height="18" alt="" style="border-radius:50%;vertical-align:text-bottom;" /> ${safeName}${suffix}`;
+  const avatarForMarkdown = circularAvatarUrl(avatarUrl);
+  return `Spotted by <img src="${avatarForMarkdown}" width="18" height="18" alt="" /> ${safeName}${suffix}`;
+};
+
+const circularAvatarUrl = (avatarUrl: string): string => {
+  const trimmed = String(avatarUrl || "").trim();
+  if (!/^https?:\/\//i.test(trimmed)) return "";
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//i, "");
+  const encodedSource = encodeURIComponent(withoutProtocol);
+  return `https://wsrv.nl/?url=${encodedSource}&w=72&h=72&fit=cover&mask=circle&n=-1`;
 };
 
 const buildShareMessage = (
