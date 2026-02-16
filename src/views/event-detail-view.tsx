@@ -206,17 +206,24 @@ const spottedByMarkdown = (
     return `Spotted by ${safeName}${suffix}`;
   }
 
-  const avatarForMarkdown = circularAvatarUrl(avatarUrl);
+  const avatarForMarkdown = renderableAvatarUrl(avatarUrl);
   return `Spotted by <img src="${avatarForMarkdown}" width="18" height="18" alt="" /> ${safeName}${suffix}`;
 };
 
-const circularAvatarUrl = (avatarUrl: string): string => {
+const renderableAvatarUrl = (avatarUrl: string): string => {
   const trimmed = String(avatarUrl || "").trim();
   if (!/^https?:\/\//i.test(trimmed)) return "";
+  const safeOriginal = trimmed.replace(/"/g, "%22");
 
-  const withoutProtocol = trimmed.replace(/^https?:\/\//i, "");
-  const encodedSource = encodeURIComponent(withoutProtocol);
-  return `https://wsrv.nl/?url=${encodedSource}&w=72&h=72&fit=cover&mask=circle&n=-1`;
+  // Supabase supports built-in image transforms. Request a square crop so the
+  // avatar is not stretched by fixed width/height in markdown rendering.
+  const objectPublicPath = "/storage/v1/object/public/";
+  const renderPublicPath = "/storage/v1/render/image/public/";
+  if (!safeOriginal.includes(objectPublicPath)) return safeOriginal;
+
+  const transformed = safeOriginal.replace(objectPublicPath, renderPublicPath);
+  const joiner = transformed.includes("?") ? "&" : "?";
+  return `${transformed}${joiner}width=72&height=72&resize=cover`;
 };
 
 const buildShareMessage = (
