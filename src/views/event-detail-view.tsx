@@ -198,13 +198,16 @@ const spottedByMarkdown = (
   if (!label) return null;
 
   const avatarUrl = String(details?.spottedBy?.avatarUrl || "").trim();
-  const text = `Spotted by ${escapeMarkdown(label)}`;
+  const [namePart, ...restParts] = label.split(" · ");
+  const safeName = escapeMarkdown(namePart || "a local");
+  const suffix = restParts.length ? ` · ${escapeMarkdown(restParts.join(" · "))}` : "";
 
   if (!/^https?:\/\//i.test(avatarUrl)) {
-    return text;
+    return `Spotted by ${safeName}${suffix}`;
   }
 
-  return `<img src="${avatarUrl}" width="18" height="18" alt="" /> ${text}`;
+  const safeAvatarUrl = avatarUrl.replace(/"/g, "%22");
+  return `Spotted by <img src="${safeAvatarUrl}" width="18" height="18" alt="" style="border-radius:50%;vertical-align:text-bottom;" /> ${safeName}${suffix}`;
 };
 
 const buildShareMessage = (
