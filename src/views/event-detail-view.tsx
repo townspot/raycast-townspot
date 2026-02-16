@@ -130,14 +130,14 @@ const sanitizeDescription = (value: string | null): string | null => {
 const buildMarkdown = (
   title: string,
   description: string | null,
-  spottedBy: string | null,
+  spottedByMarkdown: string | null,
 ): string => {
   const blocks = [`# ${escapeMarkdown(title)}`];
   if (description) {
     blocks.push("", description);
   }
-  if (spottedBy) {
-    blocks.push("", `Spotted by ${escapeMarkdown(spottedBy)}`);
+  if (spottedByMarkdown) {
+    blocks.push("", spottedByMarkdown);
   }
   return blocks.join("\n");
 };
@@ -190,6 +190,23 @@ const spottedByLabel = (
   return parts.length ? `${name} · ${parts.join(" · ")}` : name;
 };
 
+const spottedByMarkdown = (
+  details: EventDetails | null,
+  timezone: string,
+): string | null => {
+  const label = spottedByLabel(details, timezone);
+  if (!label) return null;
+
+  const avatarUrl = String(details?.spottedBy?.avatarUrl || "").trim();
+  const text = `Spotted by ${escapeMarkdown(label)}`;
+
+  if (!/^https?:\/\//i.test(avatarUrl)) {
+    return text;
+  }
+
+  return `<img src="${avatarUrl}" width="18" height="18" alt="" /> ${text}`;
+};
+
 const buildShareMessage = (
   title: string,
   timeRangeLabel: string,
@@ -219,7 +236,6 @@ const EventMetadata = ({
   const recurring = recurringLabel(event);
   const price = priceLabel(details);
   const categories = categoryList(details, event);
-  const spottedBy = spottedByLabel(details, effectiveTimezone);
 
   return (
     <Detail.Metadata>
@@ -326,7 +342,7 @@ export const EventDetailView = ({
 
   const detailMarkdown = useMemo(() => {
     const description = sanitizeDescription(details?.description || null);
-    const spottedBy = spottedByLabel(details, effectiveTimezone);
+    const spottedBy = spottedByMarkdown(details, effectiveTimezone);
     return buildMarkdown(details?.title || event.title, description, spottedBy);
   }, [details, effectiveTimezone, event.title]);
 
