@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Detail } from "@raycast/api";
+import { Action, ActionPanel, Detail, Image } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   appleMapsUrl,
@@ -196,18 +196,7 @@ const spottedByMarkdown = (
 ): string | null => {
   const label = spottedByLabel(details, timezone);
   if (!label) return null;
-
-  const avatarUrl = String(details?.spottedBy?.avatarUrl || "").trim();
-  const [namePart, ...restParts] = label.split(" · ");
-  const safeName = escapeMarkdown(namePart || "a local");
-  const suffix = restParts.length ? ` · ${escapeMarkdown(restParts.join(" · "))}` : "";
-
-  if (!/^https?:\/\//i.test(avatarUrl)) {
-    return `Spotted by ${safeName}${suffix}`;
-  }
-
-  const avatarForMarkdown = renderableAvatarUrl(avatarUrl);
-  return `Spotted by <img src="${avatarForMarkdown}" width="18" height="18" alt="" /> ${safeName}${suffix}`;
+  return `Spotted by ${escapeMarkdown(label)}`;
 };
 
 const renderableAvatarUrl = (avatarUrl: string): string => {
@@ -224,6 +213,17 @@ const renderableAvatarUrl = (avatarUrl: string): string => {
   const transformed = safeOriginal.replace(objectPublicPath, renderPublicPath);
   const joiner = transformed.includes("?") ? "&" : "?";
   return `${transformed}${joiner}width=72&height=72&resize=cover`;
+};
+
+const spottedByAvatarIcon = (
+  details: EventDetails | null,
+): { source: string; mask: Image.Mask } | undefined => {
+  const avatarUrl = renderableAvatarUrl(String(details?.spottedBy?.avatarUrl || "").trim());
+  if (!avatarUrl) return undefined;
+  return {
+    source: avatarUrl,
+    mask: Image.Mask.Circle,
+  };
 };
 
 const buildShareMessage = (
@@ -255,6 +255,8 @@ const EventMetadata = ({
   const recurring = recurringLabel(event);
   const price = priceLabel(details);
   const categories = categoryList(details, event);
+  const spottedBy = spottedByLabel(details, effectiveTimezone);
+  const spottedByIcon = spottedByAvatarIcon(details);
 
   return (
     <Detail.Metadata>
@@ -290,6 +292,8 @@ const EventMetadata = ({
           <Detail.Metadata.Separator />
         </>
       ) : null}
+      <Detail.Metadata.Label title="Spotted by" text={spottedBy} icon={spottedByIcon} />
+      <Detail.Metadata.Separator />
       {details?.zoneName ? (
         <>
           <Detail.Metadata.Label title="Town" text={details.zoneName} />
