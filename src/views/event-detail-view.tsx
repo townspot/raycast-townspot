@@ -264,6 +264,8 @@ const EventMetadata = ({
       <Detail.Metadata.Separator />
       <Detail.Metadata.Label title="Where" text={venueLabel} />
       <Detail.Metadata.Separator />
+      <Detail.Metadata.Label title="Spotted by" text={spottedBy} icon={spottedByIcon} />
+      <Detail.Metadata.Separator />
       {addressLabel ? (
         <>
           <Detail.Metadata.Label title="Address" text={addressLabel} />
@@ -292,8 +294,6 @@ const EventMetadata = ({
           <Detail.Metadata.Separator />
         </>
       ) : null}
-      <Detail.Metadata.Label title="Spotted by" text={spottedBy} icon={spottedByIcon} />
-      <Detail.Metadata.Separator />
       {details?.zoneName ? (
         <>
           <Detail.Metadata.Label title="Town" text={details.zoneName} />
