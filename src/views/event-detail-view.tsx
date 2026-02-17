@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Detail, Image } from "@raycast/api";
+import { Action, ActionPanel, Detail } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   appleMapsUrl,
@@ -196,34 +196,14 @@ const spottedByMarkdown = (
 ): string | null => {
   const label = spottedByLabel(details, timezone);
   if (!label) return null;
-  return `Spotted by ${escapeMarkdown(label)}`;
-};
 
-const renderableAvatarUrl = (avatarUrl: string): string => {
-  const trimmed = String(avatarUrl || "").trim();
-  if (!/^https?:\/\//i.test(trimmed)) return "";
-  const safeOriginal = trimmed.replace(/"/g, "%22");
+  const avatarUrl = String(details?.spottedBy?.avatarUrl || "").trim().replace(/"/g, "%22");
+  const safeLabel = escapeMarkdown(label);
+  if (!/^https?:\/\//i.test(avatarUrl)) {
+    return `Spotted by ${safeLabel}`;
+  }
 
-  // Supabase supports built-in image transforms. Request a square crop so the
-  // avatar is not stretched by fixed width/height in markdown rendering.
-  const objectPublicPath = "/storage/v1/object/public/";
-  const renderPublicPath = "/storage/v1/render/image/public/";
-  if (!safeOriginal.includes(objectPublicPath)) return safeOriginal;
-
-  const transformed = safeOriginal.replace(objectPublicPath, renderPublicPath);
-  const joiner = transformed.includes("?") ? "&" : "?";
-  return `${transformed}${joiner}width=72&height=72&resize=cover`;
-};
-
-const spottedByAvatarIcon = (
-  details: EventDetails | null,
-): { source: string; mask: Image.Mask } | undefined => {
-  const avatarUrl = renderableAvatarUrl(String(details?.spottedBy?.avatarUrl || "").trim());
-  if (!avatarUrl) return undefined;
-  return {
-    source: avatarUrl,
-    mask: Image.Mask.Circle,
-  };
+  return `Spotted by <img src="${avatarUrl}" width="18" height="18" alt="" /> ${safeLabel}`;
 };
 
 const buildShareMessage = (
@@ -255,16 +235,12 @@ const EventMetadata = ({
   const recurring = recurringLabel(event);
   const price = priceLabel(details);
   const categories = categoryList(details, event);
-  const spottedBy = spottedByLabel(details, effectiveTimezone);
-  const spottedByIcon = spottedByAvatarIcon(details);
 
   return (
     <Detail.Metadata>
       <Detail.Metadata.Label title="When" text={timeRangeLabel} />
       <Detail.Metadata.Separator />
       <Detail.Metadata.Label title="Where" text={venueLabel} />
-      <Detail.Metadata.Separator />
-      <Detail.Metadata.Label title="Spotted by" text={spottedBy} icon={spottedByIcon} />
       <Detail.Metadata.Separator />
       {addressLabel ? (
         <>
