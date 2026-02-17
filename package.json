@@ -65,6 +65,14 @@
         "events",
         "chat"
       ],
+      "arguments": [
+        {
+          "name": "prompt",
+          "placeholder": "Ask TownSpot AI",
+          "type": "text",
+          "required": false
+        }
+      ],
       "preferences": [
         {
           "name": "locale",

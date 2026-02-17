@@ -7,6 +7,7 @@ import {
   Form,
   getPreferenceValues,
   Icon,
+  LaunchProps,
   showToast,
   Toast,
 } from "@raycast/api";
@@ -24,6 +25,10 @@ const DEFAULT_LOCALE = "en-GB";
 
 type Preferences = {
   locale?: string;
+};
+
+type CommandArguments = {
+  prompt?: string;
 };
 
 type AskTownspotAiFormValues = {
@@ -59,11 +64,12 @@ const buildResultMarkdown = (
   return sections.join("\n");
 };
 
-export default function Command() {
+export default function Command(props: LaunchProps<{ arguments: CommandArguments }>) {
   const preferences = getPreferenceValues<Preferences>();
   const locale = normalizeLocale(preferences.locale);
-  const [draftPrompt, setDraftPrompt] = useState("");
-  const [submittedPrompt, setSubmittedPrompt] = useState("");
+  const inlinePrompt = normalizePrompt(props.arguments.prompt);
+  const [draftPrompt, setDraftPrompt] = useState(inlinePrompt);
+  const [submittedPrompt, setSubmittedPrompt] = useState(inlinePrompt);
 
   const [townName, setTownName] = useState("");
   const [isLoading, setIsLoading] = useState(false);

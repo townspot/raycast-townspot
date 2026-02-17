@@ -29,6 +29,9 @@ declare namespace Arguments {
   /** Arguments passed to the `ask` command */
   export type Ask = {}
   /** Arguments passed to the `ask-townspot-ai` command */
-  export type AskTownspotAi = {}
+  export type AskTownspotAi = {
+  /** Ask TownSpot AI */
+  "prompt": string
+}
 }
 
