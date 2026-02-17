@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Detail } from "@raycast/api";
+import { Action, ActionPanel, Detail, Image } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   appleMapsUrl,
@@ -194,16 +194,9 @@ const spottedByMarkdown = (
   details: EventDetails | null,
   timezone: string,
 ): string | null => {
-  const label = spottedByLabel(details, timezone);
-  if (!label) return null;
-
-  const avatarUrl = renderableAvatarUrl(String(details?.spottedBy?.avatarUrl || "").trim());
-  const safeLabel = escapeMarkdown(label);
-  if (!/^https?:\/\//i.test(avatarUrl)) {
-    return `Spotted by ${safeLabel}`;
-  }
-
-  return `Spotted by <img src="${avatarUrl}" width="18" height="18" alt="" /> ${safeLabel}`;
+  void details;
+  void timezone;
+  return null;
 };
 
 const renderableAvatarUrl = (avatarUrl: string): string => {
@@ -219,6 +212,17 @@ const renderableAvatarUrl = (avatarUrl: string): string => {
   const transformed = safeOriginal.replace(objectPublicPath, renderPublicPath);
   const joiner = transformed.includes("?") ? "&" : "?";
   return `${transformed}${joiner}width=72&height=72&resize=cover`;
+};
+
+const spottedByAvatarIcon = (
+  details: EventDetails | null,
+): { source: string; mask: Image.Mask } | undefined => {
+  const avatarUrl = renderableAvatarUrl(String(details?.spottedBy?.avatarUrl || "").trim());
+  if (!avatarUrl) return undefined;
+  return {
+    source: avatarUrl,
+    mask: Image.Mask.Circle,
+  };
 };
 
 const buildShareMessage = (
@@ -250,12 +254,16 @@ const EventMetadata = ({
   const recurring = recurringLabel(event);
   const price = priceLabel(details);
   const categories = categoryList(details, event);
+  const spottedBy = spottedByLabel(details, effectiveTimezone);
+  const spottedByIcon = spottedByAvatarIcon(details);
 
   return (
     <Detail.Metadata>
       <Detail.Metadata.Label title="When" text={timeRangeLabel} />
       <Detail.Metadata.Separator />
       <Detail.Metadata.Label title="Where" text={venueLabel} />
+      <Detail.Metadata.Separator />
+      <Detail.Metadata.Label title="Spotted by" text={spottedBy} icon={spottedByIcon} />
       <Detail.Metadata.Separator />
       {addressLabel ? (
         <>
