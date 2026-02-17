@@ -197,13 +197,28 @@ const spottedByMarkdown = (
   const label = spottedByLabel(details, timezone);
   if (!label) return null;
 
-  const avatarUrl = String(details?.spottedBy?.avatarUrl || "").trim().replace(/"/g, "%22");
+  const avatarUrl = renderableAvatarUrl(String(details?.spottedBy?.avatarUrl || "").trim());
   const safeLabel = escapeMarkdown(label);
   if (!/^https?:\/\//i.test(avatarUrl)) {
     return `Spotted by ${safeLabel}`;
   }
 
   return `Spotted by <img src="${avatarUrl}" width="18" height="18" alt="" /> ${safeLabel}`;
+};
+
+const renderableAvatarUrl = (avatarUrl: string): string => {
+  const trimmed = String(avatarUrl || "").trim();
+  if (!/^https?:\/\//i.test(trimmed)) return "";
+  const safeOriginal = trimmed.replace(/"/g, "%22");
+
+  // Use Supabase transform so markdown receives a square crop, avoiding squash.
+  const objectPublicPath = "/storage/v1/object/public/";
+  const renderPublicPath = "/storage/v1/render/image/public/";
+  if (!safeOriginal.includes(objectPublicPath)) return safeOriginal;
+
+  const transformed = safeOriginal.replace(objectPublicPath, renderPublicPath);
+  const joiner = transformed.includes("?") ? "&" : "?";
+  return `${transformed}${joiner}width=72&height=72&resize=cover`;
 };
 
 const buildShareMessage = (
